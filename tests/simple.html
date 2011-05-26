@@ -1,0 +1,137 @@
+<html>
+<head>
+
+<style>
+    body {
+        background: black;
+        overflow:hidden;
+        padding:0;
+        margin:0;
+        color: white;
+    }
+    
+    #header 
+    {
+        margin: 0;
+        padding: 5;
+        background: #c60;
+        color: #fff;
+        font-family: Arial;
+        font-weight: bold;
+    }
+
+    #ViewContainer {
+        position: absolute;
+    }
+    
+</style>
+
+<title>Godzi WebGL</title>
+
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+
+<script type="text/javascript" src="../js/jquery/jquery-1.4.2.js"></script>
+<script type="text/javascript" src="../js/jquery/jquery.mousewheel.js"></script>
+<script type="text/javascript">
+$.noConflict();
+</script>
+
+<script type="text/javascript" src="../js/osgjs/stats.js"></script>
+<script type="text/javascript" src="../js/osgjs/webgl-utils.js"></script>
+<script type="text/javascript" src="../js/osgjs/osg.js"></script>
+<script type="text/javascript" src="../js/osgjs/osgDB.js"></script>
+<script type="text/javascript" src="../js/osgjs/osgUtil.js"></script>
+<script type="text/javascript" src="../js/osgjs/osgAnimation.js"></script>
+<script type="text/javascript" src="../js/osgjs/osgGA.js"></script>
+<script type="text/javascript" src="../js/osgjs/osgViewer.js"></script>
+
+<script type="text/javascript" src="../js/osgearth/osgearth.js"></script>
+
+<script type="text/javascript">
+
+
+function getWindowSize()
+{
+    var myWidth = 0, myHeight = 0;
+    
+    if( typeof( window.innerWidth ) == 'number' ) {
+        //Non-IE
+        myWidth = window.innerWidth;
+        myHeight = window.innerHeight;
+    }
+    else if( document.documentElement && ( document.documentElement.clientWidth || document.documentElement.clientHeight ) ) {
+        //IE 6+ in 'standards compliant mode'
+        myWidth = document.documentElement.clientWidth;
+        myHeight = document.documentElement.clientHeight;
+    } 
+    else if( document.body && ( document.body.clientWidth || document.body.clientHeight ) ) {
+        //IE 4 compatible
+        myWidth = document.body.clientWidth;
+        myHeight = document.body.clientHeight;
+    }
+    return { 'w': myWidth, 'h': myHeight }; 
+}
+
+function createMap() {
+    var map = new osgearth.Map();
+  map.addImageLayer(new osgearth.TMSImageLayer("Landsat", "http://readymap.org/readymap/tiles/1.0.0/22/"));
+//    map.addImageLayer(new osgearth.TMSImageLayer("OSM", "http://readymap.org/readymap/tiles/1.0.0/35/"));
+	return map;
+}
+
+window.addEventListener("load", function() {
+    var size = getWindowSize();
+    jQuery('#3DView').css("width", size.w);
+    jQuery('#3DView').css("height", size.h);
+
+    var canvas = document.getElementById("3DView");
+    canvas.width = size.w;
+    canvas.height = size.h - jQuery('#header').height();
+
+    var viewer;
+	var frameCount = 0;
+	
+	var map;
+		
+
+    try {
+        viewer = new osgViewer.Viewer(canvas);
+        viewer.init();
+        viewer.setupManipulator();
+		map = createMap();
+        viewer.setScene(map.createNode());
+        viewer.initStats({});
+        delete viewer.view.light;
+        viewer.getManipulator().computeHomePosition();
+		viewer.frameEnd = function() {
+		  //frameCount+=1;
+		  var viewMatrix = viewer.view.getViewMatrix();		  
+		  viewMatrix = osg.Matrix.inverse(viewMatrix);
+		  var eye = [];
+		  osg.Matrix.getTrans(viewMatrix, eye);		 
+		  var lla = map._profile._ellipsoid.ecef2lla(eye);
+		  lla[0] = osgearth.rad2deg(lla[0]);
+		  lla[1] = osgearth.rad2deg(lla[1]);
+		  jQuery("#EyePoint").html("Eye: " + lla.toString());
+		}
+        viewer.run();
+    }
+    catch (er) {
+        osg.log("exception in osgViewer " + er);
+    }
+
+}, true);
+
+</script>
+</head>
+
+<body>
+  <div id="header">
+    <p>osgEarth / WebGL - Pelican Mapping</p>	
+	<p id="EyePoint"></p>
+  </div>
+  <div id="ViewContainer">
+    <canvas id="3DView"></canvas>
+  </div>
+</body>
+</html>
