@@ -18,10 +18,19 @@
         color: #fff;
         font-family: Arial;
         font-weight: bold;
-    }
+    }    
 
-    #ViewContainer {
+    #ViewContainer 
+    {
+        clear: both;
         position: absolute;
+    }
+    
+    #Coords
+    {
+        float: right;
+        position: relative;
+        z-index: 10;
     }
     
 </style>
@@ -55,7 +64,7 @@
             var lla = map._profile._ellipsoid.ecef2lla(eye);
             lla[0] = osgearth.rad2deg(lla[0]);
             lla[1] = osgearth.rad2deg(lla[1]);
-            jQuery("#EyePoint").html("Lat = " + lla[0].toFixed(2) + "\u00B0" + " Long = " + lla[1].toFixed(2) + "\u00B0");
+            jQuery("#Coords").html("Lat: " + lla[0].toFixed(2) + "\u00B0" + " Long = " + lla[1].toFixed(2) + "\u00B0");
         }
     });
 
@@ -64,12 +73,12 @@
 
 <body>
   <div id="header">
-    <p>osgEarth / WebGL - Pelican Mapping</p>	
-	<p id="EyePoint"></p>
+    <p>osgEarth / WebGL - Pelican Mapping</p>
   </div>
   <div id="ViewContainer">
     <canvas id="3DView"></canvas>
   </div>
+    <p id="Coords"></p>
 </body>
 
 </html>

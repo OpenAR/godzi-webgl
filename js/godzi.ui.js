@@ -15,7 +15,7 @@ godzi.MapView = function(elementId, size, map) {
         this.viewer = new osgViewer.Viewer(canvas);
         this.viewer.init();
         this.viewer.setupManipulator();
-        this.viewer.initStats({});
+        //this.viewer.initStats({});
         this.viewer.setScene(map.createNode());
         delete this.viewer.view.light;
         this.viewer.getManipulator().computeHomePosition();
