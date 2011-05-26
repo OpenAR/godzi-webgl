@@ -224,6 +224,7 @@ osgearth.ImageLayer.prototype = {
 
 //------------
 
+/*
 osgearth.TMSImageLayer = function(name, url) {
     osgearth.ImageLayer.call(this, name);
     this._url = url;
@@ -249,6 +250,7 @@ osgearth.TMSImageLayer.prototype = {
         return osg.Texture.create(imageURL);
     }
 };
+*/
 
 //------------
 
