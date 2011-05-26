@@ -3,10 +3,9 @@
  */
 var osgearth = {};
 
-osgearth.version = '0.0.1';
-osgearth.copyright = 'Pelican Mapping - http://pelicanmapping.com';
+osgearth.copyright = '(c) Copyright 2011 Pelican Mapping - http://pelicanmapping.com';
 osgearth.instance = 0;
-osgearth.version = 0;
+osgearth.version = '0.0.1';
 osgearth.log = function(str) {
     if (window.console !== undefined) {
         window.console.log(str);
