@@ -1,6 +1,10 @@
 /**
- *
- */
+* Godzi/WebGL
+* (c) Copyright 2011 Pelican Mapping
+* License: LGPL
+* http://godzi.org
+*/
+
 var osgearth = {};
 
 osgearth.copyright = '(c) Copyright 2011 Pelican Mapping - http://pelicanmapping.com';
@@ -67,34 +71,34 @@ osgearth.EllipsoidModel = function() {
 osgearth.EllipsoidModel.prototype = {
 
     setRadii: function(equatorial, polar) {
-        this._radiusEquator = equatorial;
-        this._radiusPolar = polar;
+        this.radiusEquator = equatorial;
+        this.radiusPolar = polar;
         var flattening = (equatorial - polar) / equatorial;
-        this._ecc2 = 2 * flattening - flattening * flattening;
+        this.ecc2 = 2 * flattening - flattening * flattening;
     },
 
     lla2ecef: function(lla) {
         var sinLat = Math.sin(lla[0]);
         var cosLat = Math.cos(lla[0]);
-        var N = this._radiusEquator / Math.sqrt(1.0 - this._ecc2 * sinLat * sinLat);
+        var N = this.radiusEquator / Math.sqrt(1.0 - this.ecc2 * sinLat * sinLat);
         var x = (N + lla[2]) * cosLat * Math.cos(lla[1]);
         var y = (N + lla[2]) * cosLat * Math.sin(lla[1]);
-        var z = (N * (1 - this._ecc2) + lla[2]) * sinLat;
+        var z = (N * (1 - this.ecc2) + lla[2]) * sinLat;
         return [x, y, z];
     },
 
     ecef2lla: function(ecef) {
         var p = Math.sqrt(ecef[0] * ecef[0] + ecef[1] * ecef[1]);
-        var theta = Math.atan2(ecef[2] * this._radiusEquator, (p * this._radiusPolar));
-        var eDashSquared = (this._radiusEquator * this._radiusEquator - this._radiusPolar * this._radiusPolar) /
-                              (this._radiusPolar * this._radiusPolar);
-        var sin_theta = Math.sin(theta);
-        var cos_theta = Math.cos(theta);
-        var lat = Math.atan((ecef[2] + eDashSquared * this._radiusPolar * sin_theta * sin_theta * sin_theta) /
-                             (p - this._ecc2 * this._radiusEquator * cos_theta * cos_theta * cos_theta));
+        var theta = Math.atan2(ecef[2] * this.radiusEquator, (p * this.radiusPolar));
+        var eDashSquared = (this.radiusEquator * this.radiusEquator - this.radiusPolar * this.radiusPolar) /
+                              (this.radiusPolar * this.radiusPolar);
+        var sintheta = Math.sin(theta);
+        var costheta = Math.cos(theta);
+        var lat = Math.atan((ecef[2] + eDashSquared * this.radiusPolar * sintheta * sintheta * sintheta) /
+                             (p - this.ecc2 * this.radiusEquator * costheta * costheta * costheta));
         var lon = Math.atan2(ecef[1], ecef[0]);
-        var sin_lat = Math.sin(lat);
-        var N = this._radiusEquator / Math.sqrt(1.0 - this._ecc2 * sin_lat * sin_lat);
+        var sinlat = Math.sin(lat);
+        var N = this.radiusEquator / Math.sqrt(1.0 - this.ecc2 * sinlat * sinlat);
         var alt = p / Math.cos(lat) - N;
         
         return [lat, lon, alt];
@@ -135,19 +139,19 @@ osgearth.EllipsoidModel.prototype = {
 //------------
 
 osgearth.Profile = function() {
-    this._extent = [
+    this.extent = [
         osgearth.deg2rad(-180), osgearth.deg2rad(-90),
         osgearth.deg2rad(180),  osgearth.deg2rad(90) ];
-    this._ellipsoid = new osgearth.EllipsoidModel();
-    this._baseTilesX = 2;
-    this._baseTilesY = 1;
+    this.ellipsoid = new osgearth.EllipsoidModel();
+    this.baseTilesX = 2;
+    this.baseTilesY = 1;
 };
 
 osgearth.Profile.prototype = {
 
     getTileSize: function(lod) {
-        var width = osgearth.Extent.width(this._extent) / this._baseTilesX;
-        var height = osgearth.Extent.height(this._extent) / this._baseTilesY;
+        var width = osgearth.Extent.width(this.extent) / this.baseTilesX;
+        var height = osgearth.Extent.height(this.extent) / this.baseTilesY;
         for (var i = 0; i < lod; i++) {
             width /= 2.0;
             height /= 2.0;
@@ -157,7 +161,7 @@ osgearth.Profile.prototype = {
 
     getTileCount: function(lod) {
         var e = Math.pow(2, lod);
-        return [this._baseTilesX * e, this._baseTilesY * e];
+        return [this.baseTilesX * e, this.baseTilesY * e];
     }
 };
 
@@ -203,8 +207,8 @@ osgearth.TileKey = {
 
     getExtent: function(key, profile) {
         var size = profile.getTileSize(key[2]);
-        var xmin = profile._extent[0] + (size[0] * key[0]);
-        var ymax = profile._extent[3] - (size[1] * key[1]);
+        var xmin = profile.extent[0] + (size[0] * key[0]);
+        var ymax = profile.extent[3] - (size[1] * key[1]);
         return [xmin, ymax - size[1], xmin + size[0], ymax];
     }       
 };
@@ -212,57 +216,27 @@ osgearth.TileKey = {
 //------------
 
 osgearth.ImageLayer = function(name) {
-    this._name = name;
+    this.name = name;
 };
 
 osgearth.ImageLayer.prototype = {
 
     name: function() {
-        return this._name;
+        return this.name;
     }
 };
-
-//------------
-
-/*
-osgearth.TMSImageLayer = function(name, url) {
-    osgearth.ImageLayer.call(this, name);
-    this._url = url;
-    this._flipY = true;
-};
-
-osgearth.TMSImageLayer.prototype = {
-
-    getURL: function(key, profile) {
-      var y = key[1];
-
-      if (this._flipY) {
-          var size = profile.getTileCount(key[2]);
-          y = (size[1] - 1) - key[1];
-      }
-
-      var imageURL = this._url + "/" + key[2] + "/" + key[0] + "/" + y + ".jpg";
-      return imageURL;      
-    },
-    
-    createTexture: function(key, profile) {
-        var imageURL = this.getURL(key, profile);
-        return osg.Texture.create(imageURL);
-    }
-};
-*/
 
 //------------
 
 osgearth.Map = function() {
-    this._profile = new osgearth.Profile();
-    this._imageLayers = [];
+    this.profile = new osgearth.Profile();
+    this.imageLayers = [];
 };
 
 osgearth.Map.prototype = {
 
     addImageLayer: function(layer) {
-        this._imageLayers.push(layer);
+        this.imageLayers.push(layer);
     },
 
     createNode: function() {
@@ -271,7 +245,6 @@ osgearth.Map.prototype = {
         node.addChild(new osgearth.Tile([1, 0, 0], this, null));
         return node;
     }
-
 };
 
 //------------
@@ -280,13 +253,13 @@ osgearth.Tile = function(key, map) {
 
     osg.Node.call(this);
 
-    this._key = key;
-    this._map = map;
+    this.key = key;
+    this.map = map;
 
-    var extent = osgearth.TileKey.getExtent(key, map._profile);
+    var extent = osgearth.TileKey.getExtent(key, map.profile);
 
     // xforms LLA to tile [0..1]
-    this._lla2local = [
+    this.lla2local = [
         osgearth.Extent.width(extent), 0.0, 0.0, 0.0,
         0.0, osgearth.Extent.height(extent), 0.0, 0.0,
         0.0, 0.0, 1.0, 0.0,
@@ -294,18 +267,18 @@ osgearth.Tile = function(key, map) {
 
     var centerLLA = osgearth.Extent.centerLLA(extent);
 
-    this._centerECEF = map._profile._ellipsoid.lla2ecef([centerLLA[0], centerLLA[1], 0]);
-    this._centerNormal = [];
-    osg.Vec3.normalize(this._centerECEF, this._centerNormal);
-    this._deviation = 0.0;
+    this.centerECEF = map.profile.ellipsoid.lla2ecef([centerLLA[0], centerLLA[1], 0]);
+    this.centerNormal = [];
+    osg.Vec3.normalize(this.centerECEF, this.centerNormal);
+    this.deviation = 0.0;
 
-    this._geometry = null;
-    this._subtilesRequested = false;
-    this._subtileRange = 1e7;
+    this.geometry = null;
+    this.subtilesRequested = false;
+    this.subtileRange = 1e7;
 
-    this._tileReady = false;
+    this.tileReady = false;
     
-    this._tex = null;
+    this.tex = null;
 
     this.build();
 };
@@ -313,7 +286,7 @@ osgearth.Tile = function(key, map) {
 osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
 
     computeBound: function(bs) {
-        return this._xform.computeBound(bs);
+        return this.xform.computeBound(bs);
     },
 
     insertArray: function(from, to, toIndex) {
@@ -333,12 +306,12 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
         var numRows = 8;
         var numCols = 8;
 
-        var extent = osgearth.TileKey.getExtent(this._key, this._map._profile);
+        var extent = osgearth.TileKey.getExtent(this.key, this.map.profile);
         var lonSpacing = osgearth.Extent.width(extent) / (numCols - 1);
         var latSpacing = osgearth.Extent.height(extent) / (numRows - 1);
 
         // localizer matrix:
-        var tile2ecef = this._map._profile._ellipsoid.local2worldFromECEF(this._centerECEF);
+        var tile2ecef = this.map.profile.ellipsoid.local2worldFromECEF(this.centerECEF);
         var ecef2tile = [];
         osg.Matrix.inverse(tile2ecef, ecef2tile);
 
@@ -351,7 +324,7 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
                 var s = col / (numCols - 1);
                 var lla = [extent[1] + latSpacing * row, extent[0] + lonSpacing * col, 0.0];
 
-                var ecef = this._map._profile._ellipsoid.lla2ecef(lla);
+                var ecef = this.map.profile.ellipsoid.lla2ecef(lla);
                 var vert = [];
                 osg.Matrix.transformVec3(ecef2tile, ecef, vert);
                 this.insertArray(vert, verts, v);
@@ -389,7 +362,7 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
         // Draws the center normal vec
         /*
                         var vert = [];
-                        osg.Matrix.transformVec3(ecef2tile, this._centerECEF, vert);
+                        osg.Matrix.transformVec3(ecef2tile, this.centerECEF, vert);
                         this.insertArray(vert, verts, v);
                         v += 3;
                         vert[2] = 1e6;
@@ -398,52 +371,48 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
                         this.insertArray([vi, vi + 1], elements, e);
                         e += 2;*/
                                                 
-        this._geometry = new osg.Geometry();
-        this._geometry.getAttributes().Vertex = osg.BufferArray.create(gl.ARRAY_BUFFER, verts, 3);
-        this._geometry.getAttributes().Normal = osg.BufferArray.create(gl.ARRAY_BUFFER, normals, 3);
-        this._geometry.getAttributes().Color = osg.BufferArray.create(gl.ARRAY_BUFFER, colors, 4);
+        this.geometry = new osg.Geometry();
+        this.geometry.getAttributes().Vertex = osg.BufferArray.create(gl.ARRAY_BUFFER, verts, 3);
+        this.geometry.getAttributes().Normal = osg.BufferArray.create(gl.ARRAY_BUFFER, normals, 3);
+        this.geometry.getAttributes().Color = osg.BufferArray.create(gl.ARRAY_BUFFER, colors, 4);
         var tris = new osg.DrawElements(gl.TRIANGLES, osg.BufferArray.create(gl.ELEMENT_ARRAY_BUFFER, elements, 1));
         //var tris = new osg.DrawElements(gl.LINE_STRIP, osg.BufferArray.create(gl.ELEMENT_ARRAY_BUFFER, elements, 1));
-        this._geometry.getPrimitives().push(tris);
+        this.geometry.getPrimitives().push(tris);
 
         // the textures:
-        for (var i = 0, n = this._map._imageLayers.length; i < n; i++) {
-            var layer = this._map._imageLayers[i];
-            this._tex = null;
-            //if (this._image == null) 
+        for (var i = 0, n = this.map.imageLayers.length; i < n; i++) {
+            var layer = this.map.imageLayers[i];
+            this.tex = null;
+            //if (this.image == null) 
             if (true) {            
-              this._tex = layer.createTexture(this._key, this._map._profile);
+              this.tex = layer.createTexture(this.key, this.map.profile);
             }
             else {
-              this._tex = osg.Texture.createFromImg(this._image);
+              this.tex = osg.Texture.createFromImg(this.image);
             }
-            this._geometry.getOrCreateStateSet().setTextureAttributeAndMode(i, this._tex);
-            //this._geometry.getAttributes().TexCoord0 = osg.BufferArray.create(gl.ARRAY_BUFFER, texcoords0, 2);
-            eval("this._geometry.getAttributes().TexCoord" + i + " = osg.BufferArray.create(gl.ARRAY_BUFFER, texcoords0, 2);");
+            this.geometry.getOrCreateStateSet().setTextureAttributeAndMode(i, this.tex);
+            //this.geometry.getAttributes().TexCoord0 = osg.BufferArray.create(gl.ARRAY_BUFFER, texcoords0, 2);
+            eval("this.geometry.getAttributes().TexCoord" + i + " = osg.BufferArray.create(gl.ARRAY_BUFFER, texcoords0, 2);");
         }        
 
-        this._xform = new osg.MatrixTransform();
-        this._xform.setMatrix(tile2ecef);
-        this._xform.addChild(this._geometry);
-       
-               
+        this.xform = new osg.MatrixTransform();
+        this.xform.setMatrix(tile2ecef);
+        this.xform.addChild(this.geometry);
 		
-        this._subtileRange = this.getBound().radius() * 3;
-        
-        
+        this.subtileRange = this.getBound().radius() * 3;
 
         // now determine the tile's deviation for normal-based culling
-        if (this._key[2] > 0) {
+        if (this.key[2] > 0) {
             for (var i = 0; i < 4; i++) {
                 var vec = [];
-                osg.Vec3.sub(corner[i], this._centerECEF, vec);
+                osg.Vec3.sub(corner[i], this.centerECEF, vec);
                 osg.Vec3.normalize(vec, vec);
-                var dot = osg.Vec3.dot(this._centerNormal, vec);
-                if (dot < this._deviation)
-                    this._deviation = dot;
+                var dot = osg.Vec3.dot(this.centerNormal, vec);
+                if (dot < this.deviation)
+                    this.deviation = dot;
             }
         }
-        this._deviation -= 0.2;
+        this.deviation -= 0.2;
     },
 
     requestSubtiles: function() {
@@ -454,15 +423,14 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
 		parent.loadSubtile(2);
 		parent.loadSubtile(3);
 		
-        this._subtilesRequested = true;        
+        this.subtilesRequested = true;        
     },
 
     loadSubtile: function(quadrant) {
-        var tile = new osgearth.Tile(osgearth.TileKey.child(this._key, quadrant), this._map);
+        var tile = new osgearth.Tile(osgearth.TileKey.child(this.key, quadrant), this.map);
         this.addChild(tile);
     },
     
-           
     getEyePoint: function(visitor) {
         var lastViewMatrix = visitor.modelviewMatrixStack[visitor.modelviewMatrixStack.length - 1];
         var mvmInv = [];
@@ -476,24 +444,23 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
 		
         if (visitor.modelviewMatrixStack !== undefined) { // i.e., in cull visitor
             var eye = this.getEyePoint(visitor);
-		
 
             var centerToEye = [];
-            osg.Vec3.sub(eye, this._centerECEF, centerToEye);
+            osg.Vec3.sub(eye, this.centerECEF, centerToEye);
             osg.Vec3.normalize(centerToEye, centerToEye);
 
-            if (this._key[2] == 0 || osg.Vec3.dot(centerToEye, this._centerNormal) >= this._deviation) {
+            if (this.key[2] == 0 || osg.Vec3.dot(centerToEye, this.centerNormal) >= this.deviation) {
                 var bound = this.getBound();
                 var range = osg.Vec3.length(osg.Vec3.sub(eye, bound.center()));
 
                 var traverseChildren = true;
                 var numChildren = this.children.length;
 
-                if (range > this._subtileRange) {
+                if (range > this.subtileRange) {
                     traverseChildren = false;
                 }
                 else {
-                    if (!this._subtilesRequested) {
+                    if (!this.subtilesRequested) {
                         this.requestSubtiles();
                         traverseChildren = false;
                     }                                       
@@ -505,7 +472,7 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
                       //Check to see if the images are ready
                       var allImagesReady = true;
                       for (var i = 0; i < this.children.length; i++) {
-                        if (!this.children[i]._tex.isImageReady())
+                        if (!this.children[i].tex.isImageReady())
                         {
                           allImagesReady = false;
                           break;
@@ -523,7 +490,7 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
                     }
                 }
                 else {
-                    this._xform.accept(visitor);
+                    this.xform.accept(visitor);
                 }
             }
         }

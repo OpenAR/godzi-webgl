@@ -47,8 +47,8 @@
     godzi.init("../js/", function() {
 
         // create a map model:
-        var map = godzi.createMap();
-        map.addImageLayer(new osgearth.TMSImageLayer("Landsat", "http://readymap.org/readymap/tiles/1.0.0/22/"));
+        var map = new godzi.Map();  //godzi.createMap();
+        map.addImageLayer(new godzi.TMSImageLayer("Landsat", "http://readymap.org/readymap/tiles/1.0.0/22/"));
 
         // create a view tied to a page element:
         var size = godzi.getWindowSize();
@@ -61,7 +61,7 @@
             viewMatrix = osg.Matrix.inverse(viewMatrix);
             var eye = [];
             osg.Matrix.getTrans(viewMatrix, eye);
-            var lla = map._profile._ellipsoid.ecef2lla(eye);
+            var lla = map.profile.ellipsoid.ecef2lla(eye);
             lla[0] = osgearth.rad2deg(lla[0]);
             lla[1] = osgearth.rad2deg(lla[1]);
             jQuery("#Coords").html("Lat: " + lla[0].toFixed(2) + "\u00B0" + " Long = " + lla[1].toFixed(2) + "\u00B0");

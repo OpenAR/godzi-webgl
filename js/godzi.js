@@ -1,4 +1,11 @@
 /**
+* Godzi/WebGL
+* (c) Copyright 2011 Pelican Mapping
+* License: LGPL
+* http://godzi.org
+*/
+
+/**
 * $.include - script inclusion jQuery plugin
 * Based on idea from http://www.gnucitizen.org/projects/jquery-include/
 * @author Tobiasz Cudnik
@@ -89,7 +96,8 @@ godzi.init = function(scriptDir, onload) {
         "osgjs/osgGA.js",
         "osgjs/osgViewer.js",
         "osgearth/osgearth.js",
-        "godzi.ui.js"
+        "godzi/godzi.ui.js",
+        "godzi/godzi.data.js"
     ];
 
     for (var i in libs) {
