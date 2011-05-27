@@ -8,6 +8,7 @@
 /**
  * EarthManipulator
  * Mouse/keyboard motion model for navigating a 3D global map
+ * Temporary implementation
  */
 
 godzi.EarthManipulator = function(map) {
@@ -96,7 +97,6 @@ godzi.MapView = function(elementId, size, map) {
         this.viewer = new osgViewer.Viewer(canvas);
         this.viewer.init();
         this.viewer.setupManipulator(new godzi.EarthManipulator(map));
-        //this.viewer.initStats({});
         this.viewer.setScene(map.createNode());
         delete this.viewer.view.light;
         this.viewer.getManipulator().computeHomePosition();

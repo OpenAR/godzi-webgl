@@ -6,78 +6,85 @@
 */
 
 /**
+* jQuery extension to ensure ordered loading of dependencies. -GW 2011/05
+* 
+* Inspired by:
+*
 * $.include - script inclusion jQuery plugin
 * Based on idea from http://www.gnucitizen.org/projects/jquery-include/
 * @author Tobiasz Cudnik
 * @link http://meta20.net/.include_script_inclusion_jQuery_plugin
 * @license MIT
 */
+
 // overload jquery's onDomReady
 if (jQuery.browser.mozilla || jQuery.browser.opera) {
     document.removeEventListener("DOMContentLoaded", jQuery.ready, false);
     document.addEventListener("DOMContentLoaded", function() { jQuery.ready(); }, false);
 }
+
 jQuery.event.remove(window, "load", jQuery.ready);
+
 jQuery.event.add(window, "load", function() { jQuery.ready(); });
+
 jQuery.extend({
-    includeStates: {},
-    include: function(url, callback, dependency) {
-        if (typeof callback != 'function' && !dependency) {
-            dependency = callback;
-            callback = null;
-        }
-        url = url.replace('\n', '');
-        jQuery.includeStates[url] = false;
-        var script = document.createElement('script');
-        script.type = 'text/javascript';
+
+    includeList: [],
+    includeLoaded: {},
+    includePtr: 0,
+
+    includeInOrder: function(libs) {
+        this.includeList = libs;
+        this.includePtr = 0;
+        this.loadInclude(this.includePtr);
+    },
+
+    loadNext: function() {
+        this.includePtr++;
+        if (this.includePtr < this.includeList.length)
+            this.loadInclude(this.includePtr);
+    },
+
+    loadInclude: function(i) {
+        if (this.includePtr >= this.includeList.length)
+            return;
+        var host = this;
+        var url = this.includeList[i].replace('\n', '');
+        var script = document.createElement("script");
+        script.type = "text/javascript";
+        script.src = url;
+        
+        this.includeLoaded[script] = false;
+        
+        // set both callbacks to support different browser behaviors
         script.onload = function() {
-            jQuery.includeStates[url] = true;
-            if (callback)
-                callback.call(script);
+            if (host.includeLoaded[this] === false) {
+                host.includeLoaded[this] = true;
+                host.loadNext();
+            }
         };
         script.onreadystatechange = function() {
-            if (this.readyState != "complete" && this.readyState != "loaded") return;
-            jQuery.includeStates[url] = true;
-            if (callback)
-                callback.call(script);
+            if (this.readyState != 'complete' && this.readyState != 'loaded')
+                return;
+            if (host.includedLoaded[this] === false) {
+                host.includeLoaded[this] = true;
+                host.loadNext();
+            }
         };
-        script.src = url;
-        if (dependency) {
-            if (dependency.constructor != Array)
-                dependency = [dependency];
-            setTimeout(function() {
-                var valid = true;
-                $.each(dependency, function(k, v) {
-                    if (!v()) {
-                        valid = false;
-                        return false;
-                    }
-                })
-                if (valid)
-                    document.getElementsByTagName('head')[0].appendChild(script);
-                else
-                    setTimeout(arguments.callee, 10);
-            }, 10);
-        }
-        else
-            document.getElementsByTagName('head')[0].appendChild(script);
-        return function() {
-            return jQuery.includeStates[url];
-        }
+        
+        document.getElementsByTagName('head')[0].appendChild(script);
     },
+
     readyOld: jQuery.ready,
+
     ready: function() {
-        if (jQuery.isReady) return;
-        imReady = true;
-        $.each(jQuery.includeStates, function(url, state) {
-            if (!state)
-                return imReady = false;
-        });
-        if (imReady) {
+        if (jQuery.isReady)
+            return;
+        var imReady = jQuery.includePtr >= jQuery.includeList.length;
+        if (imReady)
             jQuery.readyOld.apply(jQuery, arguments);
-        } else {
+        else
             setTimeout(arguments.callee, 10);
-        }
     }
 });
 
@@ -100,9 +107,12 @@ godzi.init = function(scriptDir, onload) {
         "godzi/godzi.data.js"
     ];
 
+    var libsWithDir = [];
     for (var i in libs) {
-        $.include(scriptDir + libs[i]);
+        libsWithDir.push(scriptDir + libs[i]);
     }
+
+    $.includeInOrder(libsWithDir);
 
     window.addEventListener("load", onload, true);
 };
