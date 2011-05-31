@@ -24,6 +24,14 @@ osgearth.deg2rad = function(deg) {
 osgearth.rad2deg = function(rad) {
     return rad * 57.2957795;
 }
+osgearth.clamp = function(x, min, max) {
+    if (x < min)
+        return min;
+    else if (x > max)
+        return max;
+    else
+        return x;
+}
 
 osgearth.url = function(url) {
   if (osgearth.proxy !== undefined && osgearth.proxy != null) {
@@ -100,20 +108,18 @@ osgearth.EllipsoidModel.prototype = {
         var sinlat = Math.sin(lat);
         var N = this.radiusEquator / Math.sqrt(1.0 - this.ecc2 * sinlat * sinlat);
         var alt = p / Math.cos(lat) - N;
-        
+
         return [lat, lon, alt];
     },
 
     local2worldFromECEF: function(ecef) {
         var lla = this.ecef2lla(ecef);
 
-        var l2w = [];
-        osg.Matrix.makeTranslate(ecef[0], ecef[1], ecef[2], l2w);
+        var l2w = osg.Matrix.makeTranslate(ecef[0], ecef[1], ecef[2]);
 
         var up = [Math.cos(lla[1]) * Math.cos(lla[0]), Math.sin(lla[1]) * Math.cos(lla[0]), Math.sin(lla[0])];
         var east = [-Math.sin(lla[1]), Math.cos(lla[1]), 0];
-        var north = [];
-        osg.Vec3.cross(up, east, north);
+        var north = osg.Vec3.cross(up, east);
 
         osg.Matrix.set(l2w, 0, 0, east[0]);
         osg.Matrix.set(l2w, 0, 1, east[1]);
