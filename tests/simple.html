@@ -26,6 +26,13 @@
         position: absolute;
     }
     
+    #Help
+    {
+        float:left;
+        position:absolute;
+        z-index:10;
+    }
+    
     #Coords
     {
         float: right;
@@ -65,11 +72,9 @@
             lla[0] = osgearth.rad2deg(lla[0]);
             lla[1] = osgearth.rad2deg(lla[1]);
             jQuery("#Coords").html(
-                "Lat: " + lla[0].toFixed(2) + "\u00B0" + " Long = " + lla[1].toFixed(2) + "\u00B0" );
-//                "<br/>" +
-//                "Center: " + mapView.viewer.manipulator.out_center + "<br/>" +
-//                "Eye: " + mapView.viewer.manipulator.out_eye + "<br/>" +
-//                "Dist: " + mapView.viewer.manipulator.distance + "<br/>" +
+                "Lat: " + lla[0].toFixed(2) + "\u00B0" + "  Long = " + lla[1].toFixed(2) + "\u00B0" + "<br/>" +
+                "Azim: " + osgearth.rad2deg(mapView.viewer.manipulator.localAzim).toFixed(1) + "\u00B0" +
+                "  Pitch:" + osgearth.rad2deg(mapView.viewer.manipulator.localPitch).toFixed(1) + "\u00B0");            
         }
     });
 
@@ -83,6 +88,7 @@
   <div id="ViewContainer">
     <canvas id="3DView"></canvas>
   </div>
+    <p id="Help">Mouse to pan<br />Shift-mouse to rotate</p>
     <p id="Coords"></p>
 </body>
 

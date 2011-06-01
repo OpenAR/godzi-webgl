@@ -12,9 +12,18 @@
 
 //........................................................................
 
+// eventually add all this stuff to osgjs:
+
 osg.Quat.zeroRotation = function(q) {
     return q[0]==0 && q[1]==0 & q[2]==0 && q[3]==1;
 };
+
+// osgjs's Quat.mult backwards?
+osg.Quat.multiply = function(a,b,r) {
+    if ( r === undefined )
+       r = [];
+    return osg.Quat.mult(b,a,r);
+}
 
 osg.Quat.rotateVecOnToVec = function(from, to, r) {
     if ( r === undefined )
@@ -84,9 +93,11 @@ osg.Quat.rotateVecOnToVec = function(from, to, r) {
     return r;
 };
 
+//........................................................................
+
 godzi.EarthManipulator = function(map) {
     this.map = map;
-    this.center = [0,0,0];
+    this.center = [0, 0, 0];
     this.minDistance = 0.001;
     this.maxDistance = 1e10;
     this.minPitch = osgearth.deg2rad(-89.9);
@@ -95,13 +106,8 @@ godzi.EarthManipulator = function(map) {
     this.rotation = osg.Quat.makeIdentity();
     this.centerRotation = osg.Quat.makeIdentity();
     this.lockAzimWhilePanning = true;
-    this.init();
-        this.out_eye = [];
-        this.out_center = [];
-        this.out_up = [];
-        this.out_distance = 0;
-    
-    this.setViewpoint( 0, -90, 0, 0, -90, 19134411 );
+    this.setViewpoint(0, -90, 0, 0, -90, 19134411);
+    this.pv = [];
 }
 
 godzi.EarthManipulator.prototype = {
@@ -129,6 +135,10 @@ godzi.EarthManipulator.prototype = {
             return false;
         } else if (ev.keyCode === 34) { //pagedown
             this.distanceDecrease();
+            return false;
+        }
+        else if (ev.keyCode === 13) { // mode
+            this.mode = 1 - this.mode;
             return false;
         }
     },
@@ -167,7 +177,11 @@ godzi.EarthManipulator.prototype = {
         this.clientX = curX;
         this.clientY = curY;
 
-        this.update(deltaX, deltaY);
+        if (ev.shiftKey)
+            this.rotateModel(-deltaX, -deltaY);
+        else
+            this.panModel(-deltaX, -deltaY);
+
         return false;
     },
 
@@ -217,10 +231,12 @@ godzi.EarthManipulator.prototype = {
         return [osg.Matrix.get(m, 2, 0), osg.Matrix.get(m, 2, 1), osg.Matrix.get(m, 2, 2)];
     },
 
-    getAzimuth: function() {
-        var frame = this.getCoordFrame(this.center);
-        var m = osg.Matrix.inverse(frame);
-        osg.Matrix.postMult(this.getMatrix(), m);
+    getAzimuth: function(frame) {
+        //return this.localAzim;
+
+        var m = this.getMatrix();
+        var frameInv = osg.Matrix.inverse(frame);
+        osg.Matrix.postMult(frameInv, m);
 
         var look = osg.Vec3.normalize(osg.Vec3.neg(this.getUpVector(m)));
         var up = osg.Vec3.normalize(this.getFrontVector(m));
@@ -236,22 +252,13 @@ godzi.EarthManipulator.prototype = {
         return this.normalizeAzimRad(azim);
     },
 
-    getHPRFromQuat: function(q, h, p, r) {
-        var rot = osg.Matrix.makeRotateFromQuat(q);
-        p = Math.asin(osg.Matrix.get(rot, 1, 2));
-        if (Math.abs(p - Math.PI / 2) < 0.000001) {
-            r = 0;
-            h = Math.atan2(osg.Matrix.get(rot, 0, 1), osg.Matrix.get(rot, 0, 0));
-        }
-        else {
-            r = Math.atan2(osg.Matrix.get(rot, 0, 2), osg.Matrix.get(rot, 2, 2));
-            h = Math.atan2(osg.Matrix.get(rot, 1, 0), osg.Matrix.get(rot, 1, 1));
-        }
-    },
-
     recalcLocalPitchAndAzim: function() {
-        var r = 0.0;
-        this.getHPRFromQuat(this.rotation, this.localAzim, this.localPitch, r);
+        var rot = osg.Matrix.makeRotateFromQuat(this.rotation);
+        this.localPitch = Math.asin(osg.Matrix.get(rot, 1, 2));
+        if (Math.abs(this.localPitch - Math.PI / 2) < 0.000001)
+            this.localAzim = Math.atan2(osg.Matrix.get(rot, 0, 1), osg.Matrix.get(rot, 0, 0));
+        else
+            this.localAzim = Math.atan2(osg.Matrix.get(rot, 1, 0), osg.Matrix.get(rot, 1, 1));
         this.localPitch -= Math.PI / 2.0;
     },
 
@@ -283,45 +290,62 @@ godzi.EarthManipulator.prototype = {
 
     panModel: function(dx, dy) {
         var scale = -0.3 * this.distance;
-        var oldAzim = this.getAzimuth();
-
-        var rq = osg.Quat.mult(this.rotation, this.centerRotation);
-        var rotMatrix = osg.Matrix.makeRotateFromQuat(rq);
-
-        var sideVector = this.getSideVector(rotMatrix);
-        var upVector = this.getFrontVector(rotMatrix);
-
         var oldFrame = this.getCoordFrame(this.center);
-        sideVector = this.getSideVector(oldFrame);
-        upVector = this.getUpVector(oldFrame);
 
-        var localUp = upVector;
+        var oldAzim = this.getAzimuth(oldFrame);
 
-        var forwardVector = osg.Vec3.cross(localUp, sideVector);
-        sideVector = osg.Vec3.cross(forwardVector, localUp);
+        var rotMatrix = osg.Matrix.makeRotateFromQuat(osg.Quat.multiply(this.rotation, this.centerRotation));
 
-        osg.Vec3.normalize(forwardVector, forwardVector);
-        osg.Vec3.normalize(sideVector, sideVector);
+        var side = this.getSideVector(rotMatrix);
+        var previousUp = this.getUpVector(oldFrame);
 
-        var dv = osg.Vec3.add(osg.Vec3.mult(forwardVector, (dy * scale)), osg.Vec3.mult(sideVector, (dx * scale)));
+        var forward = osg.Vec3.cross(previousUp, side);
+        side = osg.Vec3.cross(forward, previousUp);
+
+        osg.Vec3.normalize(forward, forward);
+        osg.Vec3.normalize(side, side);
+
+        var dv = osg.Vec3.add(osg.Vec3.mult(forward, (dy * scale)), osg.Vec3.mult(side, (dx * scale)));
 
         this.center = osg.Vec3.add(this.center, dv);
 
-        if (this.node !== undefined) {
-            var newFrame = this.getCoordFrame(this.center);
-            this.recalculateCenter(newFrame);
-            this.centerRotation = osg.Matrix.getRotate(newFrame);
+        var newFrame = this.getCoordFrame(this.center);
 
-            if (this.lockAzimWhilePanning) {
-                var newAzim = this.getAzimuth();
-                var deltaAzim = newAzim - oldAzim;
-                var newLocalUp = this.getUpVector(newFrame);
-                var q = osg.Quat.makeRotate(deltaAzim, newLocalUp[0], newLocalUp[1], newLocalUp[2]);
-                if (!osg.Quat.zeroRotation(q)) {
-                    this.centerRotation = osg.Quat.mult(this.centerRotation, q);
-                }
+        if (this.lockAzimWhilePanning) {
+            this.centerRotation = osg.Matrix.getRotate(newFrame);
+        }
+        else {
+            var newUp = this.getUpVector(newFrame);
+            var panRot = osg.Quat.rotateVecOnToVec(previousUp, newUp);
+            if (!osg.Quat.zeroRotation(panRot)) {
+                osg.Quat.multiply(this.centerRotation, panRot, this.centerRotation);
             }
         }
+
+        this.recalculateCenter(newFrame);
+        this.recalcLocalPitchAndAzim();
+    },
+
+    rotateModel: function(dx, dy) {
+
+        if (dy + this.localPitch > this.maxPitch || dy + this.localPitch < this.minPitch)
+            dy = 0;
+
+        var rotMat = osg.Matrix.makeRotateFromQuat(this.rotation);
+
+        var side = this.getSideVector(rotMat);
+        var front = osg.Vec3.cross([0, 0, 1], side);
+        side = osg.Vec3.cross(front, [0, 0, 1]);
+
+        osg.Vec3.normalize(front, front);
+        osg.Vec3.normalize(side, side);
+
+        this.pv = side;
+
+        var p = osg.Quat.makeRotate(dy, side[0], side[1], side[2]);
+        var a = osg.Quat.makeRotate(-dx, 0, 0, 1);
+
+        this.rotation = osg.Quat.multiply(this.rotation, osg.Quat.multiply(p, a));
 
         this.recalcLocalPitchAndAzim();
     },
@@ -374,12 +398,13 @@ godzi.EarthManipulator.prototype = {
 
         var azim_q = osg.Quat.makeRotate(newAzim, 0, 0, 1);
         var pitch_q = osg.Quat.makeRotate(-newPitch - (Math.PI / 2.0), 1, 0, 0);
-        var newRot_m = osg.Matrix.makeRotateFromQuat(osg.Quat.mult(azim_q, pitch_q));
+        var newRot_m = osg.Matrix.makeRotateFromQuat(osg.Quat.multiply(azim_q, pitch_q));
         this.rotation = osg.Matrix.getRotate(osg.Matrix.inverse(newRot_m));
 
         this.localPitch = newPitch;
         this.localAzim = newAzim;
 
+        this.recalcLocalPitchAndAzim();
         this.recalculateCenter(localFrame);
     },
 
@@ -392,7 +417,6 @@ godzi.EarthManipulator.prototype = {
     },
 
     getInverseMatrix: function() {
-
         var m = osg.Matrix.makeTranslate(-this.center[0], -this.center[1], -this.center[2]);
         osg.Matrix.postMult(osg.Matrix.makeRotateFromQuat(osg.Quat.inverse(this.centerRotation)), m);
         osg.Matrix.postMult(osg.Matrix.makeRotateFromQuat(osg.Quat.inverse(this.rotation)), m);
