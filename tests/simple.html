@@ -31,6 +31,7 @@
         float:left;
         position:absolute;
         z-index:10;
+        margin-left: 5;
     }
     
     #Coords
@@ -38,6 +39,8 @@
         float: right;
         position: relative;
         z-index: 10;
+        margin: 2;
+        padding: 2;
     }
     
     a { color: #ffffff; }
@@ -86,14 +89,27 @@
 
 <body>
   <div id="header">
-    <img id="logo" align="right" height="42" src="http://pelicanmapping.com/wp-content/uploads/2011/02/pelican-logo-262x93-light.png" />
-    <p>Godzi / WebGL - <a href="http://pelicanmapping.com">Pelican Mapping</a></p>
+    <a href="http://pelicanmapping.com" border="0"><img id="logo" align="right" height="50" src="http://pelicanmapping.com/wp-content/uploads/2011/02/pelican-logo-262x93-light.png" /></a>
+    <p>
+        Godzi / WebGL :: 
+        <a href="http://godzi.org">wiki</a> :: 
+        <a href="http://github.com/gwaldron/godzi-webgl">github</a> ::
+        <a href="http://twitter.com/#!/pelicanmapping">twitter</a>
+    </p>
   </div>
   <div id="ViewContainer">
     <canvas id="3DView"></canvas>
   </div>
-    <p id="Help">* Mouse to pan<br />* Shift-mouse to rotate</p>
-    <p id="Coords"></p>
+  <div id="Help">
+    <ul>
+      <li>drag to pan</li>
+      <li>wheel to zoom</li>
+      <li>shift-drag to rotate</li>
+      <li>space to reset</li>
+    </ul>
+  </div>
+  <div id="Coords">
+  </div>
 </body>
 
 </html>

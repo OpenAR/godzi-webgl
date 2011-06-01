@@ -101,13 +101,12 @@ godzi.EarthManipulator = function(map) {
     this.minDistance = 0.001;
     this.maxDistance = 1e10;
     this.minPitch = osgearth.deg2rad(-89.9);
-    this.maxPitch = osgearth.deg2rad(0);
+    this.maxPitch = osgearth.deg2rad(-10.0);
     this.buttonup = true;
     this.rotation = osg.Quat.makeIdentity();
     this.centerRotation = osg.Quat.makeIdentity();
     this.lockAzimWhilePanning = true;
-    this.setViewpoint(0, -90, 0, 0, -90, 19134411);
-    this.pv = [];
+    this.computeHomePosition();
 }
 
 godzi.EarthManipulator.prototype = {
@@ -124,7 +123,7 @@ godzi.EarthManipulator.prototype = {
     },
 
     computeHomePosition: function() {
-        this.setViewpoint(0, -90, 0, 0, -90, 19134411);
+        this.setViewpoint(0, -90, 0, 0, -90, 1e7);
     },
 
     keydown: function(ev) {
