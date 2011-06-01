@@ -384,7 +384,7 @@ godzi.EarthManipulator.prototype = {
     },
 
     setViewpoint: function(lat, lon, alt, heading, pitch, range) {
-        var lla = [osgearth.deg2rad(lat), osgearth.deg2rad(lon), alt];
+        var lla = [osgearth.deg2rad(lon), osgearth.deg2rad(lat), alt];
         this.center = this.map.profile.ellipsoid.lla2ecef(lla);
 
         var newPitch = osgearth.clamp(osgearth.deg2rad(pitch), this.minPitch, this.maxPitch);

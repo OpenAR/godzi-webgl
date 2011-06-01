@@ -43,34 +43,21 @@ osgearth.url = function(url) {
 
 //------------
 osgearth.Extent = {
-
-    xmin: function(extent) {
-        return extent[0];
-    },
-    ymin: function(extent) {
-        return extent[1];
-    },
-    xmax: function(extent) {
-        return extent[2];
-    },
-    ymax: function(extent) {
-        return extent[3];
-    },
     width: function(extent) {
-        return extent[2] - extent[0];
+        return extent.xmax - extent.xmin;
     },
     height: function(extent) {
-        return extent[3] - extent[1];
+        return extent.ymax - extent.ymin;
     },
-    centerXY: function(extent) {
-        return [(extent[0] + extent[2]) / 2, (extent[1] + extent[3]) / 2];
-    },
-    centerLLA: function(extent) {
-        return [(extent[1] + extent[3]) / 2, (extent[0] + extent[2]) / 2];
+    center: function(extent) {
+        return [(extent.xmin + extent.xmax) / 2, (extent.ymin + extent.ymax) / 2];
     }
 };
 
 //------------
+
+osgearth.MERC_MAX_DEG = 85.084059050110383;
+osgearth.MERC_MAX_RAD = 1.48499697;
 
 osgearth.EllipsoidModel = function() {
     this.setRadii(6378137.0, 6356752.3142); // WGS84
@@ -83,14 +70,15 @@ osgearth.EllipsoidModel.prototype = {
         this.radiusPolar = polar;
         var flattening = (equatorial - polar) / equatorial;
         this.ecc2 = 2 * flattening - flattening * flattening;
+        this.absMaxMerc = Math.PI * this.radiusEquator;
     },
 
     lla2ecef: function(lla) {
-        var sinLat = Math.sin(lla[0]);
-        var cosLat = Math.cos(lla[0]);
+        var sinLat = Math.sin(lla[1]);
+        var cosLat = Math.cos(lla[1]);
         var N = this.radiusEquator / Math.sqrt(1.0 - this.ecc2 * sinLat * sinLat);
-        var x = (N + lla[2]) * cosLat * Math.cos(lla[1]);
-        var y = (N + lla[2]) * cosLat * Math.sin(lla[1]);
+        var x = (N + lla[2]) * cosLat * Math.cos(lla[0]);
+        var y = (N + lla[2]) * cosLat * Math.sin(lla[0]);
         var z = (N * (1 - this.ecc2) + lla[2]) * sinLat;
         return [x, y, z];
     },
@@ -109,7 +97,7 @@ osgearth.EllipsoidModel.prototype = {
         var N = this.radiusEquator / Math.sqrt(1.0 - this.ecc2 * sinlat * sinlat);
         var alt = p / Math.cos(lat) - N;
 
-        return [lat, lon, alt];
+        return [lon, lat, alt];
     },
 
     local2worldFromECEF: function(ecef) {
@@ -117,8 +105,8 @@ osgearth.EllipsoidModel.prototype = {
 
         var l2w = osg.Matrix.makeTranslate(ecef[0], ecef[1], ecef[2]);
 
-        var up = [Math.cos(lla[1]) * Math.cos(lla[0]), Math.sin(lla[1]) * Math.cos(lla[0]), Math.sin(lla[0])];
-        var east = [-Math.sin(lla[1]), Math.cos(lla[1]), 0];
+        var up = [Math.cos(lla[0]) * Math.cos(lla[1]), Math.sin(lla[0]) * Math.cos(lla[1]), Math.sin(lla[1])];
+        var east = [-Math.sin(lla[0]), Math.cos(lla[0]), 0];
         var north = osg.Vec3.cross(up, east);
 
         osg.Matrix.set(l2w, 0, 0, east[0]);
@@ -139,18 +127,85 @@ osgearth.EllipsoidModel.prototype = {
     local2worldFromLLA: function(lla) {
         var ecef = lla2ecef(lla);
         return local2worldFromECEF(ecef);
+    },
+
+    // http://wiki.openstreetmap.org/wiki/Mercator
+    lla2merc: function(lla) {
+        var x = this.radiusEquator * lla[0];
+        var lat = lla[1];
+        if (lat > this.absMaxMerc) lat = this.absMaxMerc;
+        if (lat < -this.absMaxMerc) lat = -this.absMaxMerc;
+        var temp = this.radiusPolar / this.radiusEquator;
+        var es = 1.0 - (temp * temp);
+        var eccent = Math.sqrt(es);
+        var phi = lat;
+        var sinphi = Math.sin(phi);
+        var con = eccent * sinphi;
+        var com = .5 * eccent;
+        var con2 = Math.pow((1.0 - con) / (1.0 + con), com);
+        var ts = Math.tan(.5 * (Math.PI * 0.5 - phi)) / con2;
+        var y = 0 - this.r_major * Math.log(ts);
+        return [x, y, lla[2]];
+    },
+
+    // http://wiki.openstreetmap.org/wiki/Mercator
+    merc2lla: function(merc) {
+        var lon = merc[0] / this.radiusEquator;
+        var temp = this.radiusPolar / this.radiusEquator;
+        var e = Math.sqrt(1.0 - (temp * temp));
+        var lat = this.pj_phi2(Math.exp(0 - (merc[1] / this.radiusEquator)), e);
+        return [lon, lat, merc[2] !== undefined ? merc[2] : 0];
+    },
+
+    // http://wiki.openstreetmap.org/wiki/Mercator
+    pj_phi2: function(ts, e) {
+        var N_ITER = 15;
+        var HALFPI = Math.PI / 2;
+        var TOL = 0.0000000001;
+        var eccnth, Phi, con, dphi;
+        var i;
+        var eccnth = .5 * e;
+        Phi = HALFPI - 2. * Math.atan(ts);
+        i = N_ITER;
+        do {
+            con = e * Math.sin(Phi);
+            dphi = HALFPI - 2. * Math.atan(ts * Math.pow((1. - con) / (1. + con), eccnth)) - Phi;
+            Phi += dphi;
+        } while (Math.abs(dphi) > TOL && --i);
+        return Phi;
     }
+
 };
 
 //------------
 
 osgearth.Profile = function() {
-    this.extent = [
-        osgearth.deg2rad(-180), osgearth.deg2rad(-90),
-        osgearth.deg2rad(180),  osgearth.deg2rad(90) ];
+    this.name = "Undefined";
+    this.extent = { xmin: 0, ymin: 0, xmax: 0, ymax: 0 }; 
     this.ellipsoid = new osgearth.EllipsoidModel();
-    this.baseTilesX = 2;
+    this.baseTilesX = 1;
     this.baseTilesY = 1;
+    this.isGeographic = false;
+};
+
+osgearth.Profile.makeWGS84 = function() {
+    var p = new osgearth.Profile();
+    p.name = "WGS84";
+    p.extent = { xmin: -Math.PI, ymin: -Math.PI / 2, xmax: Math.PI, ymax: Math.PI / 2 };
+    p.baseTilesX = 2;
+    p.baseTilesY = 1;
+    p.isGeographic = true;
+    return p;
+};
+
+osgearth.Profile.makeMercator = function() {
+    var p = new osgearth.Profile();
+    p.name = "Mercator";
+    p.extent = { xmin: -p.ellipsoid.absMaxMerc, ymin: -p.ellipsoid.absMaxMerc, xmax: p.ellipsoid.absMaxMerc, ymax: p.ellipsoid.absMaxMerc };
+    p.baseTilesX = 2;
+    p.baseTilesY = 2;
+    p.isGeographic = false;
+    return p;
 };
 
 osgearth.Profile.prototype = {
@@ -213,16 +268,31 @@ osgearth.TileKey = {
 
     getExtent: function(key, profile) {
         var size = profile.getTileSize(key[2]);
-        var xmin = profile.extent[0] + (size[0] * key[0]);
-        var ymax = profile.extent[3] - (size[1] * key[1]);
-        return [xmin, ymax - size[1], xmin + size[0], ymax];
-    }       
+        var xmin = profile.extent.xmin + (size[0] * key[0]);
+        var ymax = profile.extent.ymax - (size[1] * key[1]);
+        var r = { "xmin": xmin, "ymin": ymax - size[1], "xmax": xmin + size[0], "ymax": ymax };
+        return r;
+    },
+
+    getExtentLLA: function(key, profile) {
+        var ex = this.getExtent(key, profile);
+        if (profile.isGeographic) {
+            return ex;
+        }
+        else {
+            var min = profile.ellipsoid.merc2lla([ex.xmin, ex.ymin, 0]);
+            var max = profile.ellipsoid.merc2lla([ex.xmax, ex.ymax, 0]);
+            var r = { xmin: min[0], ymin: min[1], xmax: max[0], ymax: max[1] };
+            return r;
+        }
+    }
 };
 
 //------------
 
 osgearth.ImageLayer = function(name) {
     this.name = name;
+    this.profile = undefined;
 };
 
 osgearth.ImageLayer.prototype = {
@@ -235,7 +305,8 @@ osgearth.ImageLayer.prototype = {
 //------------
 
 osgearth.Map = function() {
-    this.profile = new osgearth.Profile();
+    this.profile = osgearth.Profile.makeWGS84();
+    this.usingDefaultProfile = true;
     this.imageLayers = [];
 };
 
@@ -243,12 +314,19 @@ osgearth.Map.prototype = {
 
     addImageLayer: function(layer) {
         this.imageLayers.push(layer);
+        if (this.usingDefaultProfile && layer.profile !== undefined) {
+            this.profile = layer.profile;
+            this.usingDefaultProfile = false;
+        }
     },
 
     createNode: function() {
         var node = new osg.Node();
-        node.addChild(new osgearth.Tile([0, 0, 0], this, null));
-        node.addChild(new osgearth.Tile([1, 0, 0], this, null));
+        for (var x = 0; x < this.profile.baseTilesX; x++) {
+            for (var y = 0; y < this.profile.baseTilesY; y++) {
+                node.addChild(new osgearth.Tile([x, y, 0], this, null));
+            }
+        }
         return node;
     }
 };
@@ -262,16 +340,16 @@ osgearth.Tile = function(key, map) {
     this.key = key;
     this.map = map;
 
-    var extent = osgearth.TileKey.getExtent(key, map.profile);
+    var extent = osgearth.TileKey.getExtentLLA(key, map.profile);
 
     // xforms LLA to tile [0..1]
     this.lla2local = [
         osgearth.Extent.width(extent), 0.0, 0.0, 0.0,
         0.0, osgearth.Extent.height(extent), 0.0, 0.0,
         0.0, 0.0, 1.0, 0.0,
-        extent[0], extent[1], 0.0, 1.0];
+        extent.xmin, extent.ymin, 0.0, 1.0];
 
-    var centerLLA = osgearth.Extent.centerLLA(extent);
+    var centerLLA = osgearth.Extent.center(extent);
 
     this.centerECEF = map.profile.ellipsoid.lla2ecef([centerLLA[0], centerLLA[1], 0]);
     this.centerNormal = [];
@@ -312,9 +390,13 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
         var numRows = 8;
         var numCols = 8;
 
-        var extent = osgearth.TileKey.getExtent(this.key, this.map.profile);
+        var extent = osgearth.TileKey.getExtentLLA(this.key, this.map.profile);
         var lonSpacing = osgearth.Extent.width(extent) / (numCols - 1);
         var latSpacing = osgearth.Extent.height(extent) / (numRows - 1);
+
+        osgearth.log("tile " + this.key + ": " +
+            osgearth.rad2deg(extent.xmin) + "," + osgearth.rad2deg(extent.ymin) + " => " + 
+            osgearth.rad2deg(extent.xmax) + "," + osgearth.rad2deg(extent.ymax) );
 
         // localizer matrix:
         var tile2ecef = this.map.profile.ellipsoid.local2worldFromECEF(this.centerECEF);
@@ -328,7 +410,7 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
 
             for (var col = 0; col < numCols; col++) {
                 var s = col / (numCols - 1);
-                var lla = [extent[1] + latSpacing * row, extent[0] + lonSpacing * col, 0.0];
+                var lla = [extent.xmin + lonSpacing * col, extent.ymin + latSpacing * row, 0.0];
 
                 var ecef = this.map.profile.ellipsoid.lla2ecef(lla);
                 var vert = [];
@@ -367,16 +449,16 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
 
         // Draws the center normal vec
         /*
-                        var vert = [];
-                        osg.Matrix.transformVec3(ecef2tile, this.centerECEF, vert);
-                        this.insertArray(vert, verts, v);
-                        v += 3;
-                        vert[2] = 1e6;
-                        this.insertArray(vert, verts, v);
-                        v += 3;
-                        this.insertArray([vi, vi + 1], elements, e);
-                        e += 2;*/
-                                                
+        var vert = [];
+        osg.Matrix.transformVec3(ecef2tile, this.centerECEF, vert);
+        this.insertArray(vert, verts, v);
+        v += 3;
+        vert[2] = 1e6;
+        this.insertArray(vert, verts, v);
+        v += 3;
+        this.insertArray([vi, vi + 1], elements, e);
+        e += 2;*/
+
         this.geometry = new osg.Geometry();
         this.geometry.getAttributes().Vertex = osg.BufferArray.create(gl.ARRAY_BUFFER, verts, 3);
         this.geometry.getAttributes().Normal = osg.BufferArray.create(gl.ARRAY_BUFFER, normals, 3);
@@ -388,23 +470,16 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
         // the textures:
         for (var i = 0, n = this.map.imageLayers.length; i < n; i++) {
             var layer = this.map.imageLayers[i];
-            this.tex = null;
-            //if (this.image == null) 
-            if (true) {            
-              this.tex = layer.createTexture(this.key, this.map.profile);
-            }
-            else {
-              this.tex = osg.Texture.createFromImg(this.image);
-            }
+            this.tex = layer.createTexture(this.key, this.map.profile);
             this.geometry.getOrCreateStateSet().setTextureAttributeAndMode(i, this.tex);
             //this.geometry.getAttributes().TexCoord0 = osg.BufferArray.create(gl.ARRAY_BUFFER, texcoords0, 2);
             eval("this.geometry.getAttributes().TexCoord" + i + " = osg.BufferArray.create(gl.ARRAY_BUFFER, texcoords0, 2);");
-        }        
+        }
 
         this.xform = new osg.MatrixTransform();
         this.xform.setMatrix(tile2ecef);
         this.xform.addChild(this.geometry);
-		
+
         this.subtileRange = this.getBound().radius() * 3;
 
         // now determine the tile's deviation for normal-based culling
@@ -422,21 +497,21 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
     },
 
     requestSubtiles: function() {
-        var parent = this;      
-                            
-		parent.loadSubtile(0);
-		parent.loadSubtile(1);
-		parent.loadSubtile(2);
-		parent.loadSubtile(3);
-		
-        this.subtilesRequested = true;        
+        var parent = this;
+
+        parent.loadSubtile(0);
+        parent.loadSubtile(1);
+        parent.loadSubtile(2);
+        parent.loadSubtile(3);
+
+        this.subtilesRequested = true;
     },
 
     loadSubtile: function(quadrant) {
         var tile = new osgearth.Tile(osgearth.TileKey.child(this.key, quadrant), this.map);
         this.addChild(tile);
     },
-    
+
     getEyePoint: function(visitor) {
         var lastViewMatrix = visitor.modelviewMatrixStack[visitor.modelviewMatrixStack.length - 1];
         var mvmInv = [];
@@ -447,7 +522,7 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
     },
 
     traverse: function(visitor) {
-		
+
         if (visitor.modelviewMatrixStack !== undefined) { // i.e., in cull visitor
             var eye = this.getEyePoint(visitor);
 
@@ -469,24 +544,22 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
                     if (!this.subtilesRequested) {
                         this.requestSubtiles();
                         traverseChildren = false;
-                    }                                       
-                    else if (this.children.length < 4) {
-                      traverseChildren = false;                      
                     }
-                    else
-                    {
-                      //Check to see if the images are ready
-                      var allImagesReady = true;
-                      for (var i = 0; i < this.children.length; i++) {
-                        if (!this.children[i].tex.isImageReady())
-                        {
-                          allImagesReady = false;
-                          break;
-                        }
-                      }
-                      if (!allImagesReady) {
+                    else if (this.children.length < 4) {
                         traverseChildren = false;
-                      }
+                    }
+                    else {
+                        //Check to see if the images are ready
+                        var allImagesReady = true;
+                        for (var i = 0; i < this.children.length; i++) {
+                            if (!this.children[i].tex.isImageReady()) {
+                                allImagesReady = false;
+                                break;
+                            }
+                        }
+                        if (!allImagesReady) {
+                            traverseChildren = false;
+                        }
                     }
                 }
 
