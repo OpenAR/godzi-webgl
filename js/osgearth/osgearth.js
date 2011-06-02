@@ -70,7 +70,7 @@ osgearth.EllipsoidModel.prototype = {
         this.radiusPolar = polar;
         var flattening = (equatorial - polar) / equatorial;
         this.ecc2 = 2 * flattening - flattening * flattening;
-        this.absMaxMerc = Math.PI * this.radiusEquator;
+        this.absMaxMerc_m = Math.PI * this.radiusEquator;
     },
 
     lla2ecef: function(lla) {
@@ -133,8 +133,8 @@ osgearth.EllipsoidModel.prototype = {
     lla2merc: function(lla) {
         var x = this.radiusEquator * lla[0];
         var lat = lla[1];
-        if (lat > this.absMaxMerc) lat = this.absMaxMerc;
-        if (lat < -this.absMaxMerc) lat = -this.absMaxMerc;
+        if (lat > this.absMaxMerc_m) lat = this.absMaxMerc_m;
+        if (lat < -this.absMaxMerc_m) lat = -this.absMaxMerc_m;
         var temp = this.radiusPolar / this.radiusEquator;
         var es = 1.0 - (temp * temp);
         var eccent = Math.sqrt(es);
@@ -180,32 +180,7 @@ osgearth.EllipsoidModel.prototype = {
 //------------
 
 osgearth.Profile = function() {
-    this.name = "Undefined";
-    this.extent = { xmin: 0, ymin: 0, xmax: 0, ymax: 0 }; 
     this.ellipsoid = new osgearth.EllipsoidModel();
-    this.baseTilesX = 1;
-    this.baseTilesY = 1;
-    this.isGeographic = false;
-};
-
-osgearth.Profile.makeWGS84 = function() {
-    var p = new osgearth.Profile();
-    p.name = "WGS84";
-    p.extent = { xmin: -Math.PI, ymin: -Math.PI / 2, xmax: Math.PI, ymax: Math.PI / 2 };
-    p.baseTilesX = 2;
-    p.baseTilesY = 1;
-    p.isGeographic = true;
-    return p;
-};
-
-osgearth.Profile.makeMercator = function() {
-    var p = new osgearth.Profile();
-    p.name = "Mercator";
-    p.extent = { xmin: -p.ellipsoid.absMaxMerc, ymin: -p.ellipsoid.absMaxMerc, xmax: p.ellipsoid.absMaxMerc, ymax: p.ellipsoid.absMaxMerc };
-    p.baseTilesX = 2;
-    p.baseTilesY = 2;
-    p.isGeographic = false;
-    return p;
 };
 
 osgearth.Profile.prototype = {
@@ -225,6 +200,62 @@ osgearth.Profile.prototype = {
         return [this.baseTilesX * e, this.baseTilesY * e];
     }
 };
+
+//------------
+
+osgearth.GeodeticProfile = function() {
+    osgearth.Profile.call(this);
+    this.name = "WGS84";
+    this.extent = { xmin: -Math.PI, ymin: -Math.PI / 2, xmax: Math.PI, ymax: Math.PI / 2 };
+    this.baseTilesX = 2;
+    this.baseTilesY = 1;
+    this.isGeographic = true;
+};
+
+osgearth.GeodeticProfile.prototype = osg.objectInehrit(osgearth.Profile.prototype, {
+});
+
+//------------
+
+osgearth.MercatorProfile = function() {
+    osgearth.Profile.call(this);
+    this.name = "Mercator";
+    this.extent = {
+        xmin: -this.ellipsoid.absMaxMerc_m,
+        ymin: -this.ellipsoid.absMaxMerc_m,
+        xmax: this.ellipsoid.absMaxMerc_m,
+        ymax: this.ellipsoid.absMaxMerc_m
+    };
+    this.baseTilesX = 2;
+    this.baseTilesY = 2;
+    this.isGeographic = false;
+
+    var exmin = this.ellipsoid.merc2lla([this.extent.xmin, this.extent.ymin, 0]);
+    var exmax = this.ellipsoid.merc2lla([this.extent.xmax, this.extent.ymax, 0]);
+    this.extentLLA = {
+        xmin: exmin[0],
+        ymin: exmin[1],
+        xmax: exmax[0],
+        ymax: exmax[1]
+    };
+};
+
+osgearth.MercatorProfile.prototype = osg.objectInehrit(osgearth.Profile.prototype, {
+
+    getUV: function(localExtentLLA, lla) {
+        var u = (lla[0] - localExtentLLA.xmin) / localExtentLLA.width;
+        var vmin = this.lat2v(osgearth.clamp(localExtentLLA.ymax, this.extentLLA.ymin, this.extentLLA.ymax));
+        var vmax = this.lat2v(osgearth.clamp(localExtentLLA.ymin, this.extentLLA.ymin, this.extentLLA.ymax));
+        var vlat = this.lat2v(osgearth.clamp(lla[1], this.extentLLA.ymin, this.extentLLA.ymax));
+        var v = 1.0 - (vlat - vmin) / (vmax - vmin);
+        return [u, v];
+    },
+
+    lat2v: function(lat) {
+        var sinLat = Math.sin(lat);
+        return 0.5 - Math.log((1 + sinLat) / (1 - sinLat)) / (4 * Math.PI);
+    }
+});
 
 //------------
 
@@ -305,7 +336,7 @@ osgearth.ImageLayer.prototype = {
 //------------
 
 osgearth.Map = function() {
-    this.profile = osgearth.Profile.makeWGS84();
+    this.profile = new osgearth.GeodeticProfile();
     this.usingDefaultProfile = true;
     this.imageLayers = [];
 };
@@ -390,13 +421,9 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
         var numRows = 8;
         var numCols = 8;
 
-        var extent = osgearth.TileKey.getExtentLLA(this.key, this.map.profile);
-        var lonSpacing = osgearth.Extent.width(extent) / (numCols - 1);
-        var latSpacing = osgearth.Extent.height(extent) / (numRows - 1);
-
-        osgearth.log("tile " + this.key + ": " +
-            osgearth.rad2deg(extent.xmin) + "," + osgearth.rad2deg(extent.ymin) + " => " + 
-            osgearth.rad2deg(extent.xmax) + "," + osgearth.rad2deg(extent.ymax) );
+        var extentLLA = osgearth.TileKey.getExtentLLA(this.key, this.map.profile);
+        var lonSpacing = osgearth.Extent.width(extentLLA) / (numCols - 1);
+        var latSpacing = osgearth.Extent.height(extentLLA) / (numRows - 1);
 
         // localizer matrix:
         var tile2ecef = this.map.profile.ellipsoid.local2worldFromECEF(this.centerECEF);
@@ -410,7 +437,7 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
 
             for (var col = 0; col < numCols; col++) {
                 var s = col / (numCols - 1);
-                var lla = [extent.xmin + lonSpacing * col, extent.ymin + latSpacing * row, 0.0];
+                var lla = [extentLLA.xmin + lonSpacing * col, extentLLA.ymin + latSpacing * row, 0.0];
 
                 var ecef = this.map.profile.ellipsoid.lla2ecef(lla);
                 var vert = [];
@@ -420,7 +447,6 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
                 var normal = [];
                 osg.Vec3.normalize(vert, normal);
                 this.insertArray(normal, normals, v);
-
                 v += 3;
 
                 this.insertArray([1, 1, 1, 1], colors, c);
@@ -432,8 +458,12 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
                 }
                 vi++;
 
+                var uv = [s, t];
+                if ( this.map.profile.getUV !== undefined )
+                    uv = this.map.profile.getUV(extentLLA, lla);
+
                 // simple [0..1] tex coords
-                this.insertArray([s, t], texcoords0, tc);
+                this.insertArray([s, uv[1]], texcoords0, tc);
                 tc += 2;
 
                 if (row == 0 && col == 0)

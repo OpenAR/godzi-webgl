@@ -59,16 +59,14 @@
     godzi.init("../js/", function() {
 
         // create a map model:
-        var map = new godzi.Map();  //godzi.createMap();
-        map.profile = osgearth.Profile.makeMercator();
-        //map.addImageLayer(new godzi.TMSImageLayer("Landsat", "http://readymap.org/readymap/tiles/1.0.0/22/"));
+        var map = new godzi.Map();
+        map.profile = new osgearth.MercatorProfile();
         map.addImageLayer(new godzi.TMSImageLayer({
             name: "OSM",
             url: "http://tile.openstreetmap.org/",
             imageType: "png",
             baseLevel: 1
         }));
-
 
         // create a view tied to a page element:
         var size = godzi.getWindowSize();
