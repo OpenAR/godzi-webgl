@@ -107,7 +107,7 @@ osgearth.EllipsoidModel.prototype = {
 
         var up = [Math.cos(lla[0]) * Math.cos(lla[1]), Math.sin(lla[0]) * Math.cos(lla[1]), Math.sin(lla[1])];
         var east = [-Math.sin(lla[0]), Math.cos(lla[0]), 0];
-        var north = osg.Vec3.cross(up, east);
+        var north = osg.Vec3.cross(up, east, []);
 
         osg.Matrix.set(l2w, 0, 0, east[0]);
         osg.Matrix.set(l2w, 0, 1, east[1]);
@@ -475,12 +475,10 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
                 var lla = [extentLLA.xmin + lonSpacing * col, extentLLA.ymin + latSpacing * row, 0.0];
 
                 var ecef = this.map.profile.ellipsoid.lla2ecef(lla);
-                var vert = [];
-                osg.Matrix.transformVec3(ecef2tile, ecef, vert);
+                var vert = osg.Matrix.transformVec3(ecef2tile, ecef, []);
                 this.insertArray(vert, verts, v);
 
-                var normal = [];
-                osg.Vec3.normalize(vert, normal);
+                var normal = osg.Vec3.normalize(vert, []);
                 this.insertArray(normal, normals, v);
                 v += 3;
 
@@ -494,7 +492,7 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
                 vi++;
 
                 var uv = [s, t];
-                if ( this.map.profile.getUV !== undefined )
+                if (this.map.profile.getUV !== undefined)
                     uv = this.map.profile.getUV(extentLLA, lla);
 
                 // simple [0..1] tex coords
@@ -597,7 +595,7 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
 
             if (this.key[2] == 0 || osg.Vec3.dot(centerToEye, this.centerNormal) >= this.deviation) {
                 var bound = this.getBound();
-                var range = osg.Vec3.length(osg.Vec3.sub(eye, bound.center()));
+                var range = osg.Vec3.length(osg.Vec3.sub(eye, bound.center(), []));
 
                 var traverseChildren = true;
                 var numChildren = this.children.length;

@@ -26,70 +26,68 @@ osg.Quat.multiply = function(a,b,r) {
 }
 
 osg.Quat.rotateVecOnToVec = function(from, to, r) {
-    if ( r === undefined )
+    if (r === undefined)
         r = [];
-        
-    var sourceVector = [];
-    osg.Vec3.copy( from, sourceVector );
-    var targetVector = [];
-    osg.Vec3.copy( to, targetVector );
-    
+
+    var sourceVector = osg.Vec3.copy(from, []);
+    var targetVector = osg.Vec3.copy(to, []);
+
     var fromLen2 = osg.Vec3.length2(from);
     var fromLen = 0;
-    if ( fromLen2 < 1-1e-7 || fromLen2 > 1+1e-7 ) {
+    if (fromLen2 < 1 - 1e-7 || fromLen2 > 1 + 1e-7) {
         fromLen = Math.sqrt(fromLen2);
-        sourceVector = osg.Vec3.mult( sourceVector, 1.0/fromLen );
+        sourceVector = osg.Vec3.mult(sourceVector, 1.0 / fromLen, []);
     }
-    
+
     var toLen2 = osg.Vec3.length2(to);
-    if ( toLen2 < 1-1e-7 || toLen2 > 1+1e-7) {
+    if (toLen2 < 1 - 1e-7 || toLen2 > 1 + 1e-7) {
         var toLen = 0;
-        if ( toLen2 > fromLen2-1e-7 && toLen2 < fromLen2+1e-7) {
+        if (toLen2 > fromLen2 - 1e-7 && toLen2 < fromLen2 + 1e-7) {
             toLen = fromLen;
         }
         else {
             toLen = Math.sqrt(toLen2);
         }
-        targetVector = osg.Vec3.mult(targetVector, 1.0/toLen);
+        targetVector = osg.Vec3.mult(targetVector, 1.0 / toLen, []);
     }
-    
+
     var dotProdPlus1 = 1.0 + osg.Vec3.dot(sourceVector, targetVector);
-    
-    if ( dotProdPlus1 < 1e-7 ) {
-        if ( Math.abs(sourceVector[0]) < 0.6 ) {
-            var norm = Math.sqrt(1.0 - sourceVector[0]*sourceVector[0]);
-            r[0] = 0.0; 
+
+    if (dotProdPlus1 < 1e-7) {
+        if (Math.abs(sourceVector[0]) < 0.6) {
+            var norm = Math.sqrt(1.0 - sourceVector[0] * sourceVector[0]);
+            r[0] = 0.0;
             r[1] = sourceVector[2] / norm;
             r[2] = -sourceVector[1] / norm;
             r[3] = 0.0;
-        } 
+        }
         else if (Math.abs(sourceVector[1]) < 0.6) {
-            var norm = Math.sqrt(1.0 - sourceVector[1]*sourceVector[1]);
+            var norm = Math.sqrt(1.0 - sourceVector[1] * sourceVector[1]);
             r[0] = -sourceVector[2] / norm;
             r[1] = 0.0;
             r[2] = sourceVector[0] / norm;
             r[3] = 0.0;
-        } 
+        }
         else {
-            var norm = Math.sqrt(1.0 - sourceVector[2]*sourceVector[2]);
+            var norm = Math.sqrt(1.0 - sourceVector[2] * sourceVector[2]);
             r[0] = sourceVector[1] / norm;
             r[1] = -sourceVector[0] / norm;
             r[2] = 0.0;
             r[3] = 0.0;
         }
     }
-    
+
     else {
         // Find the shortest angle quaternion that transforms normalized vectors
         // into one other. Formula is still valid when vectors are colinear
-        var s = Math.sqrt( 0.5 * dotProdPlus1 );
-        var tmp = osg.Vec3.cross(sourceVector, osg.Vec3.mult(targetVector, 1.0/(2.0*s)));
+        var s = Math.sqrt(0.5 * dotProdPlus1);
+        var tmp = osg.Vec3.cross(sourceVector, osg.Vec3.mult(targetVector, 1.0 / (2.0 * s)), []);
         r[0] = tmp[0];
         r[1] = tmp[1];
         r[2] = tmp[2];
         r[3] = s;
     }
-    
+
     return r;
 };
 
@@ -195,6 +193,10 @@ godzi.EarthManipulator.prototype = {
 
     touchMove: function(ev) {
     },
+    
+    mousewheel: function(ev, intDelta, deltaX, deltaY) {
+        this.zoomModel( 0, intDelta * 0.1 );
+    },
 
     getCoordFrame: function(point) {
         var l2w = this.map.profile.ellipsoid.local2worldFromECEF(point);
@@ -231,24 +233,24 @@ godzi.EarthManipulator.prototype = {
     },
 
     getAzimuth: function(frame) {
-        //return this.localAzim;
+        return this.localAzim;
 
-        var m = this.getMatrix();
-        var frameInv = osg.Matrix.inverse(frame);
-        osg.Matrix.postMult(frameInv, m);
+//        var m = this.getMatrix();
+//        var frameInv = osg.Matrix.inverse(frame);
+//        osg.Matrix.postMult(frameInv, m);
 
-        var look = osg.Vec3.normalize(osg.Vec3.neg(this.getUpVector(m)));
-        var up = osg.Vec3.normalize(this.getFrontVector(m));
+//        var look = osg.Vec3.normalize(osg.Vec3.neg(this.getUpVector(m),[]), []);
+//        var up = osg.Vec3.normalize(this.getFrontVector(m), []);
 
-        var azim;
-        if (look[2] < -0.9)
-            azim = Math.atan2(up[0], up[1]);
-        else if (look[2] > 0.9)
-            azim = Math.atan2(-up[0], -up[1]);
-        else
-            azim = Math.atan2(look[0], look[1]);
+//        var azim;
+//        if (look[2] < -0.9)
+//            azim = Math.atan2(up[0], up[1]);
+//        else if (look[2] > 0.9)
+//            azim = Math.atan2(-up[0], -up[1]);
+//        else
+//            azim = Math.atan2(look[0], look[1]);
 
-        return this.normalizeAzimRad(azim);
+//        return this.normalizeAzimRad(azim);
     },
 
     recalcLocalPitchAndAzim: function() {
@@ -267,14 +269,6 @@ godzi.EarthManipulator.prototype = {
             this.distance = this.minDistance;
         else if (this.distance > this.maxDistance)
             this.distance = this.maxDistance;
-    },
-
-    distanceIncrease: function() {
-        this.zoomModel(0, -0.1);
-    },
-
-    distanceDecrease: function() {
-        this.zoomModel(0, 0.1);
     },
 
     recalculateCenter: function(localFrame) {
@@ -298,15 +292,15 @@ godzi.EarthManipulator.prototype = {
         var side = this.getSideVector(rotMatrix);
         var previousUp = this.getUpVector(oldFrame);
 
-        var forward = osg.Vec3.cross(previousUp, side);
-        side = osg.Vec3.cross(forward, previousUp);
+        var forward = osg.Vec3.cross(previousUp, side, []);
+        side = osg.Vec3.cross(forward, previousUp, []);
 
         osg.Vec3.normalize(forward, forward);
         osg.Vec3.normalize(side, side);
 
-        var dv = osg.Vec3.add(osg.Vec3.mult(forward, (dy * scale)), osg.Vec3.mult(side, (dx * scale)));
+        var dv = osg.Vec3.add(osg.Vec3.mult(forward, (dy * scale), []), osg.Vec3.mult(side, (dx * scale), []), [])
 
-        this.center = osg.Vec3.add(this.center, dv);
+        this.center = osg.Vec3.add(this.center, dv, []);
 
         var newFrame = this.getCoordFrame(this.center);
 
@@ -333,8 +327,8 @@ godzi.EarthManipulator.prototype = {
         var rotMat = osg.Matrix.makeRotateFromQuat(this.rotation);
 
         var side = this.getSideVector(rotMat);
-        var front = osg.Vec3.cross([0, 0, 1], side);
-        side = osg.Vec3.cross(front, [0, 0, 1]);
+        var front = osg.Vec3.cross([0, 0, 1], side, []);
+        side = osg.Vec3.cross(front, [0, 0, 1], []);
 
         osg.Vec3.normalize(front, front);
         osg.Vec3.normalize(side, side);
@@ -371,16 +365,16 @@ godzi.EarthManipulator.prototype = {
 
     getRotation: function(point) {
         var cf = this.getCoordFrame(point);
-        var look = osg.Vec3.neg(this.getUpVector(cf));
+        var look = osg.Vec3.neg(this.getUpVector(cf), []);
         var worldUp = [0, 0, 1];
         var dot = Math.abs(osg.Vec3.dot(worldUp, look));
         if (Math.abs(dot - 1.0) < 0.000001)
             worldUp = [0, 1, 0];
-        var side = osg.Vec3.cross(look, worldUp);
-        var up = osg.Vec3.normalize(osg.Vec3.cross(side, look));
+        var side = osg.Vec3.cross(look, worldUp, []);
+        var up = osg.Vec3.normalize(osg.Vec3.cross(side, look, []), []);
 
         var offset = 1e-6;
-        return osg.Matrix.makeLookAt(osg.Vec3.sub(point, osg.Vec3.mult(look, offset)), point, up);
+        return osg.Matrix.makeLookAt(osg.Vec3.sub(point, osg.Vec3.mult(look, offset, []), []), point, up);
     },
 
     setViewpoint: function(lat, lon, alt, heading, pitch, range) {
@@ -439,7 +433,7 @@ godzi.MapView = function(elementId, size, map) {
     canvas.width = size.w;
     canvas.height = size.h;
 
-    try {
+    //try {
         this.viewer = new osgViewer.Viewer(canvas);
         this.viewer.init();
         this.viewer.setupManipulator(new godzi.EarthManipulator(map));
@@ -447,8 +441,8 @@ godzi.MapView = function(elementId, size, map) {
         delete this.viewer.view.light;
         this.viewer.getManipulator().computeHomePosition();
         this.viewer.run();
-    }
-    catch (er) {
-        osg.log("exception in osgViewer " + er);
-    }
+    //}
+    //catch (er) {
+        //osg.log("exception in osgViewer " + er);
+    //}
 };
