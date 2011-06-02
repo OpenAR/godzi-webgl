@@ -127,7 +127,9 @@ osgearth.EllipsoidModel.prototype = {
     local2worldFromLLA: function(lla) {
         var ecef = lla2ecef(lla);
         return local2worldFromECEF(ecef);
-    },
+    }
+    
+    /*
 
     // http://wiki.openstreetmap.org/wiki/Mercator
     lla2merc: function(lla) {
@@ -174,6 +176,8 @@ osgearth.EllipsoidModel.prototype = {
         } while (Math.abs(dphi) > TOL && --i);
         return Phi;
     }
+    
+    */
 
 };
 
@@ -230,13 +234,13 @@ osgearth.MercatorProfile = function() {
     this.baseTilesY = 2;
     this.isGeographic = false;
 
-    var exmin = this.ellipsoid.merc2lla([this.extent.xmin, this.extent.ymin, 0]);
-    var exmax = this.ellipsoid.merc2lla([this.extent.xmax, this.extent.ymax, 0]);
+    var emin = this.toLLA([this.extent.xmin, this.extent.ymin, 0]);
+    var emax = this.toLLA([this.extent.xmax, this.extent.ymax, 0]);
     this.extentLLA = {
-        xmin: exmin[0],
-        ymin: exmin[1],
-        xmax: exmax[0],
-        ymax: exmax[1]
+        xmin: emin[0],
+        ymin: emin[1],
+        xmax: emax[0],
+        ymax: emax[1]
     };
 };
 
@@ -254,7 +258,36 @@ osgearth.MercatorProfile.prototype = osg.objectInehrit(osgearth.Profile.prototyp
     lat2v: function(lat) {
         var sinLat = Math.sin(lat);
         return 0.5 - Math.log((1 + sinLat) / (1 - sinLat)) / (4 * Math.PI);
+    },
+
+    // http://wiki.openstreetmap.org/wiki/Mercator
+    toLLA: function(coord) {
+    var lon = coord[0] / this.ellipsoid.radiusEquator;
+        var temp = this.ellipsoid.radiusPolar / this.ellipsoid.radiusEquator;
+        var e = Math.sqrt(1.0 - (temp * temp));
+        var lat = this.pj_phi2(Math.exp(0 - (coord[1] / this.ellipsoid.radiusEquator)), e);
+        return [lon, lat, coord[2] !== undefined ? coord[2] : 0];
+    },
+
+    // http://wiki.openstreetmap.org/wiki/Mercator
+    pj_phi2: function(ts, e) {
+        var N_ITER = 15;
+        var HALFPI = Math.PI / 2;
+        var TOL = 0.0000000001;
+        var eccnth, Phi, con, dphi;
+        var i;
+        var eccnth = .5 * e;
+        Phi = HALFPI - 2. * Math.atan(ts);
+        i = N_ITER;
+        do {
+            con = e * Math.sin(Phi);
+            dphi = HALFPI - 2. * Math.atan(ts * Math.pow((1. - con) / (1. + con), eccnth)) - Phi;
+            Phi += dphi;
+        }
+        while (Math.abs(dphi) > TOL && --i);
+        return Phi;
     }
+
 });
 
 //------------
@@ -306,15 +339,17 @@ osgearth.TileKey = {
     },
 
     getExtentLLA: function(key, profile) {
-        var ex = this.getExtent(key, profile);
-        if (profile.isGeographic) {
-            return ex;
-        }
-        else {
-            var min = profile.ellipsoid.merc2lla([ex.xmin, ex.ymin, 0]);
-            var max = profile.ellipsoid.merc2lla([ex.xmax, ex.ymax, 0]);
+        var e = this.getExtent(key, profile);
+        if (profile.toLLA !== undefined) {
+            var min = [e.xmin, e.ymin, 0];
+            var max = [e.xmax, e.ymax, 0];
+            min = profile.toLLA(min);
+            max = profile.toLLA(max);
             var r = { xmin: min[0], ymin: min[1], xmax: max[0], ymax: max[1] };
             return r;
+        }
+        else {
+            return e;
         }
     }
 };
