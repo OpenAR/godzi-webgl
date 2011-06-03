@@ -60,7 +60,9 @@
 
         // create a map model:
         var map = new godzi.Map();
+
         map.profile = new osgearth.MercatorProfile();
+
         map.addImageLayer(new godzi.TMSImageLayer({
             name: "OSM",
             url: "http://tile.openstreetmap.org/",

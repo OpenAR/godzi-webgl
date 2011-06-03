@@ -475,8 +475,8 @@ osgearth.Tile = function(key, map) {
     this.subtileRange = 1e7;
 
     this.tileReady = false;
-    
-    this.tex = null;
+
+    this.textures = [];
 
     this.build();
 };
@@ -491,6 +491,15 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
         for (var i = 0; i < from.length; i++) {
             to[toIndex + i] = from[i];
         }
+    },
+
+    allTexturesReady: function() {
+        for (var i = 0; i < this.textures.length; i++) {
+            if (!this.textures[i].isImageReady()) {
+                return false;
+            }
+        }
+        return true;
     },
 
     build: function() {
@@ -581,8 +590,9 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
         // the textures:
         for (var i = 0, n = this.map.imageLayers.length; i < n; i++) {
             var layer = this.map.imageLayers[i];
-            this.tex = layer.createTexture(this.key, this.map.profile);
-            this.geometry.getOrCreateStateSet().setTextureAttributeAndMode(i, this.tex);
+            var tex = layer.createTexture(this.key, this.map.profile);
+            this.textures.push(tex);
+            this.geometry.getOrCreateStateSet().setTextureAttributeAndMode(i, tex);
             //this.geometry.getAttributes().TexCoord0 = osg.BufferArray.create(gl.ARRAY_BUFFER, texcoords0, 2);
             eval("this.geometry.getAttributes().TexCoord" + i + " = osg.BufferArray.create(gl.ARRAY_BUFFER, texcoords0, 2);");
         }
@@ -663,7 +673,7 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
                         //Check to see if the images are ready
                         var allImagesReady = true;
                         for (var i = 0; i < this.children.length; i++) {
-                            if (!this.children[i].tex.isImageReady()) {
+                            if (!this.children[i].allTexturesReady()) {
                                 allImagesReady = false;
                                 break;
                             }
