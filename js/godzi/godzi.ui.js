@@ -429,20 +429,36 @@ godzi.MapView = function(elementId, size, map) {
 
     this.map = map;
     this.viewer = null;
+    this.endFrame = undefined;
     var canvas = document.getElementById(elementId);
     canvas.width = size.w;
     canvas.height = size.h;
 
     //try {
-        this.viewer = new osgViewer.Viewer(canvas);
-        this.viewer.init();
-        this.viewer.setupManipulator(new godzi.EarthManipulator(map));
-        this.viewer.setScene(map.createNode());
-        delete this.viewer.view.light;
-        this.viewer.getManipulator().computeHomePosition();
-        this.viewer.run();
+    this.viewer = new osgViewer.Viewer(canvas);
+    this.viewer.init();
+    this.viewer.setupManipulator(new godzi.EarthManipulator(map));
+    this.viewer.setScene(map.createNode());
+    delete this.viewer.view.light;
+    this.viewer.getManipulator().computeHomePosition();
+    //this.viewer.run();
+    this.run();
     //}
     //catch (er) {
-        //osg.log("exception in osgViewer " + er);
+    //osg.log("exception in osgViewer " + er);
     //}
+};
+
+godzi.MapView.prototype = {
+
+    run: function() {
+        var that = this;
+        var render = function() {
+            window.requestAnimationFrame(render, this.canvas);
+            that.viewer.frame();
+            if (that.onFrameEnd !== undefined && that.onFrameEnd != null)
+                that.onFrameEnd();
+        };
+        render();
+    }
 };

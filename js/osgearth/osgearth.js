@@ -356,6 +356,54 @@ osgearth.TileKey = {
 
 //------------
 
+/**
+ * Custom texture class that customizes the fragment shader
+ */
+osgearth.Texture = function() {
+    osg.Texture.call(this);
+};
+
+osgearth.Texture.prototype = osg.objectInehrit(osg.Texture.prototype, {
+    cloneType: function() { var t = new osgearth.Texture(); t.default_type = true; return t; },
+    
+    writeToShader: function(unit, type) {
+        var str = "";
+        switch (type) {
+            case osg.ShaderGeneratorType.VertexInit:
+                str = "attribute vec2 TexCoord" + unit + ";\n";
+                str += "varying vec2 FragTexCoord" + unit + ";\n";
+                break;
+            case osg.ShaderGeneratorType.VertexMain:
+                str = "FragTexCoord" + unit + " = TexCoord" + unit + ";\n";
+                break;
+            case osg.ShaderGeneratorType.FragmentInit:
+                str = "varying vec2 FragTexCoord" + unit + ";\n";
+                str += "uniform sampler2D Texture" + unit + ";\n";
+                str += "vec4 texColor" + unit + ";\n";
+                break;
+            case osg.ShaderGeneratorType.FragmentMain:
+                str = "texColor" + unit + " = texture2D( Texture" + unit + ", FragTexCoord" + unit + ".xy );\n";
+                str += "fragColor = vec4(mix(fragColor.rgb,texColor" + unit + ".rgb,texColor" + unit + ".a),1);\n";
+                // hack to prevent the default ShaderGenerator code from overriding our mix:
+                str += "texColor" + unit + " = vec4(1,1,1,1);\n";
+                break;
+        }
+        return str;
+    }
+});
+
+osgearth.Texture.create = function(imageSource) {
+    var a = new osgearth.Texture();
+    if (imageSource !== undefined) {
+        var img = new Image();
+        img.src = imageSource;
+        a.setImage(img);
+    }
+    return a;
+};
+
+//------------
+
 osgearth.ImageLayer = function(name) {
     this.name = name;
     this.profile = undefined;

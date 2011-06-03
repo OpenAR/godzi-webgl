@@ -95,14 +95,6 @@ godzi.init = function(scriptDir, onload) {
     var libs = [
         "jquery/jquery.mousewheel.js",
         "osgjs/osg-debug-0.0.4.js",
-//        "osgjs/stats.js",
-//        "osgjs/webgl-utils.js",
-//        "osgjs/osg.js",
-//        "osgjs/osgDB.js",
-//        "osgjs/osgUtil.js",
-//        "osgjs/osgAnimation.js",
-//        "osgjs/osgGA.js",
-//        "osgjs/osgViewer.js",
         "osgearth/osgearth.js",
         "godzi/godzi.ui.js",
         "godzi/godzi.data.js"

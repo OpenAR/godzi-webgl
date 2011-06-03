@@ -32,12 +32,13 @@ godzi.TMSImageLayer.prototype = {
             y = (size[1] - 1) - key[1];
         }
 
-        var imageURL = this.url + "/" + (key[2]+this.baseLevel) + "/" + key[0] + "/" + y + "." + this.extension;
+        var imageURL = this.url + "/" + (key[2] + this.baseLevel) + "/" + key[0] + "/" + y + "." + this.extension;
         return imageURL;
     },
 
     createTexture: function(key, profile) {
         var imageURL = this.getURL(key, profile);
-        return osg.Texture.create(imageURL);
+        return osgearth.Texture.create(imageURL);
+        //return osg.Texture.create(imageURL);
     }
 };

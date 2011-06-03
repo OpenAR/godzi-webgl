@@ -75,7 +75,7 @@
         var mapView = new godzi.MapView("3DView", size, map);
 
         // display the Lat/Long:
-        mapView.viewer.frameEnd = function() {
+        mapView.onFrameEnd = function() {
             var viewMatrix = mapView.viewer.view.getViewMatrix();
             viewMatrix = osg.Matrix.inverse(viewMatrix);
             var eye = [];

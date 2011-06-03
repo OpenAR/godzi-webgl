@@ -59,10 +59,17 @@
     godzi.init("../js/", function() {
 
         // create a map model:
-        var map = new godzi.Map();  //godzi.createMap();
+        var map = new godzi.Map();
+
         map.addImageLayer(new godzi.TMSImageLayer({
             name: "Landsat",
             url: "http://readymap.org/readymap/tiles/1.0.0/22/",
+            tmsType: "google"
+        }));
+
+        map.addImageLayer(new godzi.TMSImageLayer({
+            name: "OSM",
+            url: "http://readymap.org/readymap/tiles/1.0.0/35/",
             tmsType: "google"
         }));
 
@@ -73,7 +80,7 @@
         var mapView = new godzi.MapView("3DView", size, map);
 
         // display the Lat/Long:
-        mapView.viewer.frameEnd = function() {
+        mapView.onFrameEnd = function() {
             var viewMatrix = mapView.viewer.view.getViewMatrix();
             viewMatrix = osg.Matrix.inverse(viewMatrix);
             var eye = [];
