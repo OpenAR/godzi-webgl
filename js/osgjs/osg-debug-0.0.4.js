@@ -6868,7 +6868,7 @@ osgViewer.Viewer = function(canvas, options) {
         this.urlOptions = true;
 
         this.mouseWheelEventNode = canvas;
-        this.eventNode = canvas;
+        this.eventNode = document;
         if (options && options.mouseWheelEventNode) {
             this.mouseWheelEventNode = options.mouseWheelEventNode;
         }

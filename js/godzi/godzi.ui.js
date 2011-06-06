@@ -438,6 +438,10 @@ godzi.MapView = function(elementId, size, map) {
 
     //try {
     this.viewer = new osgViewer.Viewer(canvas);
+    
+    //If you don't do this then the mouse manipulators listen for mouse events on the whole dom
+    //so dragging other controls end up moving the canvas view.
+    this.viewer.eventNode = this.viewer.canvas;
     this.viewer.init();
     this.viewer.setupManipulator(new godzi.EarthManipulator(map));
     var node = map.createNode();
@@ -445,6 +449,7 @@ godzi.MapView = function(elementId, size, map) {
     delete this.viewer.view.light;
     this.viewer.getManipulator().computeHomePosition();
     //this.viewer.run();
+    
     this.run();
     //}
     //catch (er) {
