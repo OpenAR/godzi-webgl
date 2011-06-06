@@ -331,16 +331,41 @@ osgearth.Texture.prototype = osg.objectInehrit(osg.Texture.prototype, {
                 str = "varying vec2 FragTexCoord" + unit + ";\n";
                 str += "uniform sampler2D Texture" + unit + ";\n";
                 str += "vec4 texColor" + unit + ";\n";
+                str += "uniform bool Texture" + unit + "Visible;\n";
                 break;
             case osg.ShaderGeneratorType.FragmentMain:
-                str = "texColor" + unit + " = texture2D( Texture" + unit + ", FragTexCoord" + unit + ".xy );\n";
-                str += "fragColor = vec4(mix(fragColor.rgb,texColor" + unit + ".rgb,texColor" + unit + ".a),1);\n";
+                str = "if (Texture" + unit + "Visible){\n";                
+//                str =  " if (true) {\n";
+                str += "  texColor" + unit + " = texture2D( Texture" + unit + ", FragTexCoord" + unit + ".xy );\n";
+                str += "}\n";
+                str += "else {\n";
+                str += "  texColor" + unit + " = vec4(1,0,0,1);\n";
+                str += "};\n";                
+                str += "  fragColor = vec4(mix(fragColor.rgb,texColor" + unit + ".rgb,texColor" + unit + ".a),1);\n";            
                 // hack to prevent the default ShaderGenerator code from overriding our mix:
                 str += "texColor" + unit + " = vec4(1,1,1,1);\n";
                 break;
         }
         return str;
-    }
+    },
+    
+   /*
+   getOrCreateUniforms: function(unit) {
+        if (osg.Texture.uniforms === undefined) {
+            osg.Texture.uniforms = [];
+        }
+        if (osg.Texture.uniforms[unit] === undefined) {
+            var name = this.getType() + unit;
+            var uniforms = {};
+            uniforms[name] = osg.Uniform.createInt1(unit, name);
+            uniforms[name + "Visible"] = osg.Uniform.createInt1(true, name + "Visible");
+            var uniformKeys = [name, name + "Visible"];
+            uniforms.uniformKeys = uniformKeys;
+
+            osg.Texture.uniforms[unit] = uniforms;                        
+        }
+        return osg.Texture.uniforms[unit];
+    },*/
 });
 
 osgearth.Texture.create = function(imageSource) {
@@ -358,13 +383,41 @@ osgearth.Texture.create = function(imageSource) {
 osgearth.ImageLayer = function(name) {
     this.name = name;
     this.profile = undefined;
+    this.opacity = 1.0;
+    this.visible = true;
 };
 
 osgearth.ImageLayer.prototype = {
 
     name: function() {
         return this.name;
-    }
+    },
+    
+    getOpacity: function() {
+        return this.opacity;
+    },
+    
+    setOpacity: function(opacity) {
+        if (this.opacity != opacity) {
+          this.opacity = opacity;
+          if (this.opacityUniform !== undefined ) {
+           this.opacityUniform.set( [this.opacity] );
+         }
+        }
+    },
+    
+    getVisible: function() {
+      return this.visible;
+    },
+    
+    setVisible: function( visible ) {
+      if (this.visible != visible) {
+         this.visible = visible;
+         if (this.visibleUniform !== undefined ) {
+           this.visibleUniform.set( [this.visible] );
+         }
+      }
+    }        
 };
 
 //...................................................................
@@ -379,7 +432,7 @@ osgearth.Map = function() {
     this.expireList = {};
     
     // you can monitor this value to see how many tiles are being drawn each frame.
-    this.drawListSize = 0;
+    this.drawListSize = 0;       
 };
 
 osgearth.Map.prototype = {
@@ -388,8 +441,8 @@ osgearth.Map.prototype = {
         this.imageLayers.push(layer);
         if (this.usingDefaultProfile && layer.profile !== undefined) {
             this.profile = layer.profile;
-            this.usingDefaultProfile = false;
-        }
+            this.usingDefaultProfile = false;            
+        }       
     },
 
     createNode: function() {
@@ -399,6 +452,23 @@ osgearth.Map.prototype = {
                 node.addChild(new osgearth.Tile([x, y, 0], this, null));
             }
         }
+        this.node = node;
+        
+        for (var i = 0; i < this.imageLayers.length; i++) {                
+          var visible = this.imageLayers[i].getVisible() ? true : false;
+          var visibleUniform =  osg.Uniform.createInt1(visible,"Texture" + i + "Visible");
+          this.node.getOrCreateStateSet().addUniform(visibleUniform, osg.StateAttribute.ON | osg.StateAttribute.OVERRIDE);
+          this.imageLayers[i].visibleUniform = visibleUniform;          
+
+          var opacity = this.imageLayers[i].getOpacity();
+          var opacityUniform =  osg.Uniform.createFloat1(opacity,"Texture" + i + "Opacity");          
+          this.node.getOrCreateStateSet().addUniform(opacityUniform, osg.StateAttribute.ON | osg.StateAttribute.OVERRIDE);
+          this.imageLayers[i].opacityUniform = opacityUniform;          
+          this.node.getOrCreateStateSet().addUniform(opacityUniform, osg.StateAttribute.ON | osg.StateAttribute.OVERRIDE);
+        }
+        
+        this.node.getOrCreateStateSet().myvalue = 10;
+        
         return node;
     },
 
