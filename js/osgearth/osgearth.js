@@ -467,7 +467,13 @@ osgearth.Map.prototype = {
           this.node.getOrCreateStateSet().addUniform(opacityUniform, osg.StateAttribute.ON | osg.StateAttribute.OVERRIDE);
         }
         
-        this.node.getOrCreateStateSet().myvalue = 10;
+        var program = osg.Program.create(
+            osg.Shader.create(gl.VERTEX_SHADER, this.getVertexShader()),
+            osg.Shader.create(gl.FRAGMENT_SHADER, this.getFragmentShader())
+        );      
+        node.getOrCreateStateSet().setAttributeAndMode( program, osg.StateAttribute.ON | osg.StateAttribute.OVERRIDE );
+        node.getOrCreateStateSet().addUniform(osg.Uniform.createInt1(0, "Texture0"));
+        node.getOrCreateStateSet().addUniform(osg.Uniform.createInt1(1, "Texture1"));               
         
         return node;
     },
@@ -493,6 +499,92 @@ osgearth.Map.prototype = {
         delete this.drawList;
         this.drawList = {};
         this.drawListSize = 0;
+    },
+    
+    getVertexShader: function() {
+      return [
+       "",
+       "#ifdef GL_ES",
+       "precision highp float;",
+       "#endif",
+       "attribute vec3 Vertex;",
+       "attribute vec4 Color;",
+       "attribute vec3 Normal;",
+       "uniform int ArrayColorEnabled;",
+       "uniform mat4 ModelViewMatrix;",
+       "uniform mat4 ProjectionMatrix;",
+       "uniform mat4 NormalMatrix;",
+       "varying vec4 VertexColor;",
+       "attribute vec2 TexCoord0;",
+       "varying vec2 FragTexCoord0;",
+       "attribute vec2 TexCoord1;",
+       "varying vec2 FragTexCoord1;",
+       "uniform vec4 MaterialAmbient;",
+       "uniform vec4 MaterialDiffuse;",
+       "uniform vec4 MaterialSpecular;",
+       "uniform vec4 MaterialEmission;",
+       "uniform float MaterialShininess;",
+       "vec4 Ambient;",
+       "vec4 Diffuse;",
+       "vec4 Specular;",
+       "vec4 ftransform() {",
+       "  return ProjectionMatrix * ModelViewMatrix * vec4(Vertex, 1.0);",
+       "}",
+       "void main(void) {",
+       "  gl_Position = ftransform();",
+       "  if (ArrayColorEnabled == 1) VertexColor = Color;",
+       "  else VertexColor = vec4(1.0,1.0,1.0,1.0);",
+       "  FragTexCoord0 = TexCoord0;",
+       "  FragTexCoord1 = TexCoord1;",
+       "}",
+       ""
+      ].join('\n'); 
+    },
+
+    getFragmentShader: function() {
+    return [
+      "",
+      "#ifdef GL_ES",
+      "precision highp float;",
+      "#endif",
+      "varying vec4 VertexColor;",
+      "uniform int ArrayColorEnabled;",
+      "vec4 fragColor;",
+      "varying vec2 FragTexCoord0;",
+      "uniform sampler2D Texture0;",
+      "uniform float Texture0Opacity;",
+      "vec4 texColor0;",
+      "uniform bool Texture0Visible;",
+      "uniform float Texture1Opacity;",
+      "varying vec2 FragTexCoord1;",
+      "uniform sampler2D Texture1;",
+      "vec4 texColor1;",
+      "uniform bool Texture1Visible;",
+      "void main(void) {",
+      "  fragColor = VertexColor;",
+      "  if (Texture0Visible){",
+      "    texColor0 = texture2D( Texture0, FragTexCoord0.xy );",
+      "  }",
+      " else {",
+      "     texColor0 = vec4(0,0,0,0);",
+      " };",
+      " fragColor = vec4(mix(fragColor.rgb,texColor0.rgb,texColor0.a * Texture0Opacity),1);",
+      " texColor0 = vec4(1,1,1,1);",
+      " if (Texture1Visible){",
+      "   texColor1 = texture2D( Texture1, FragTexCoord1.xy );",
+      " }",
+      " else {",
+      "   texColor1 = vec4(1,0,0,0);",
+      " };",
+      " fragColor = vec4(mix(fragColor.rgb,texColor1.rgb,texColor1.a * Texture1Opacity),1);",
+      " texColor1 = vec4(1,1,1,1);",
+      " fragColor = fragColor * texColor0;",
+      " fragColor = fragColor * texColor1;",
+      " gl_FragColor = fragColor;",
+      "}",
+      
+     ].join('\n');
+
     }
 
 };
