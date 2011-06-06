@@ -458,6 +458,7 @@ godzi.MapView.prototype = {
             that.viewer.frame();
             if (that.onFrameEnd !== undefined && that.onFrameEnd != null)
                 that.onFrameEnd();
+            that.map.frame();
         };
         render();
     }

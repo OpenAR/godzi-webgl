@@ -41,7 +41,8 @@ osgearth.url = function(url) {
   return url;
 }
 
-//------------
+//...................................................................
+
 osgearth.Extent = {
     width: function(extent) {
         return extent.xmax - extent.xmin;
@@ -54,7 +55,7 @@ osgearth.Extent = {
     }
 };
 
-//------------
+//...................................................................
 
 osgearth.MERC_MAX_DEG = 85.084059050110383;
 osgearth.MERC_MAX_RAD = 1.48499697;
@@ -128,60 +129,9 @@ osgearth.EllipsoidModel.prototype = {
         var ecef = lla2ecef(lla);
         return local2worldFromECEF(ecef);
     }
-    
-    /*
-
-    // http://wiki.openstreetmap.org/wiki/Mercator
-    lla2merc: function(lla) {
-        var x = this.radiusEquator * lla[0];
-        var lat = lla[1];
-        if (lat > this.absMaxMerc_m) lat = this.absMaxMerc_m;
-        if (lat < -this.absMaxMerc_m) lat = -this.absMaxMerc_m;
-        var temp = this.radiusPolar / this.radiusEquator;
-        var es = 1.0 - (temp * temp);
-        var eccent = Math.sqrt(es);
-        var phi = lat;
-        var sinphi = Math.sin(phi);
-        var con = eccent * sinphi;
-        var com = .5 * eccent;
-        var con2 = Math.pow((1.0 - con) / (1.0 + con), com);
-        var ts = Math.tan(.5 * (Math.PI * 0.5 - phi)) / con2;
-        var y = 0 - this.r_major * Math.log(ts);
-        return [x, y, lla[2]];
-    },
-
-    // http://wiki.openstreetmap.org/wiki/Mercator
-    merc2lla: function(merc) {
-        var lon = merc[0] / this.radiusEquator;
-        var temp = this.radiusPolar / this.radiusEquator;
-        var e = Math.sqrt(1.0 - (temp * temp));
-        var lat = this.pj_phi2(Math.exp(0 - (merc[1] / this.radiusEquator)), e);
-        return [lon, lat, merc[2] !== undefined ? merc[2] : 0];
-    },
-
-    // http://wiki.openstreetmap.org/wiki/Mercator
-    pj_phi2: function(ts, e) {
-        var N_ITER = 15;
-        var HALFPI = Math.PI / 2;
-        var TOL = 0.0000000001;
-        var eccnth, Phi, con, dphi;
-        var i;
-        var eccnth = .5 * e;
-        Phi = HALFPI - 2. * Math.atan(ts);
-        i = N_ITER;
-        do {
-            con = e * Math.sin(Phi);
-            dphi = HALFPI - 2. * Math.atan(ts * Math.pow((1. - con) / (1. + con), eccnth)) - Phi;
-            Phi += dphi;
-        } while (Math.abs(dphi) > TOL && --i);
-        return Phi;
-    }
-    
-    */
-
 };
 
-//------------
+//...................................................................
 
 osgearth.Profile = function() {
     this.ellipsoid = new osgearth.EllipsoidModel();
@@ -205,7 +155,7 @@ osgearth.Profile.prototype = {
     }
 };
 
-//------------
+//...................................................................
 
 osgearth.GeodeticProfile = function() {
     osgearth.Profile.call(this);
@@ -219,7 +169,7 @@ osgearth.GeodeticProfile = function() {
 osgearth.GeodeticProfile.prototype = osg.objectInehrit(osgearth.Profile.prototype, {
 });
 
-//------------
+//...................................................................
 
 osgearth.MercatorProfile = function() {
     osgearth.Profile.call(this);
@@ -255,6 +205,7 @@ osgearth.MercatorProfile.prototype = osg.objectInehrit(osgearth.Profile.prototyp
         return [u, v];
     },
 
+    // technically, this is spherical mercator, but that's ok for now
     lat2v: function(lat) {
         var sinLat = Math.sin(lat);
         return 0.5 - Math.log((1 + sinLat) / (1 - sinLat)) / (4 * Math.PI);
@@ -290,7 +241,7 @@ osgearth.MercatorProfile.prototype = osg.objectInehrit(osgearth.Profile.prototyp
 
 });
 
-//------------
+//...................................................................
 
 osgearth.TileKey = {
 
@@ -354,7 +305,7 @@ osgearth.TileKey = {
     }
 };
 
-//------------
+//...................................................................
 
 /**
  * Custom texture class that customizes the fragment shader
@@ -402,7 +353,7 @@ osgearth.Texture.create = function(imageSource) {
     return a;
 };
 
-//------------
+//...................................................................
 
 osgearth.ImageLayer = function(name) {
     this.name = name;
@@ -416,12 +367,19 @@ osgearth.ImageLayer.prototype = {
     }
 };
 
-//------------
+//...................................................................
 
 osgearth.Map = function() {
     this.profile = new osgearth.GeodeticProfile();
     this.usingDefaultProfile = true;
     this.imageLayers = [];
+
+    // these handle the automatic deletion of culled tiles.
+    this.drawList = {};
+    this.expireList = {};
+    
+    // you can monitor this value to see how many tiles are being drawn each frame.
+    this.drawListSize = 0;
 };
 
 osgearth.Map.prototype = {
@@ -442,10 +400,34 @@ osgearth.Map.prototype = {
             }
         }
         return node;
+    },
+
+    // called by Tile::traverse to tell the map that the tile is in use
+    markTileDrawn: function(tile) {
+        this.drawList[tile.key] = tile;
+        this.expireList[tile.key] = null;
+        this.drawListSize++;
+    },
+
+    frame: function() {
+        // anything left in the expiration list gets deleted (well its children anyway)
+        for (var key in this.expireList) {
+            tile = this.expireList[key];
+            if (tile !== undefined && tile != null && tile.parents.length > 0) {
+                tile.resetSubtiles();
+            }
+        }
+        
+        // use this frame's draw list as the next frame's expiration list.
+        this.expireList = this.drawList;
+        delete this.drawList;
+        this.drawList = {};
+        this.drawListSize = 0;
     }
+
 };
 
-//------------
+//...................................................................
 
 osgearth.Tile = function(key, map) {
 
@@ -473,9 +455,6 @@ osgearth.Tile = function(key, map) {
     this.geometry = null;
     this.subtilesRequested = false;
     this.subtileRange = 1e7;
-
-    this.tileReady = false;
-
     this.textures = [];
 
     this.build();
@@ -500,6 +479,11 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
             }
         }
         return true;
+    },
+
+    resetSubtiles: function() {
+        this.removeChildren();
+        this.subtilesRequested = false;
     },
 
     build: function() {
@@ -593,7 +577,6 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
             var tex = layer.createTexture(this.key, this.map.profile);
             this.textures.push(tex);
             this.geometry.getOrCreateStateSet().setTextureAttributeAndMode(i, tex);
-            //this.geometry.getAttributes().TexCoord0 = osg.BufferArray.create(gl.ARRAY_BUFFER, texcoords0, 2);
             eval("this.geometry.getAttributes().TexCoord" + i + " = osg.BufferArray.create(gl.ARRAY_BUFFER, texcoords0, 2);");
         }
 
@@ -645,6 +628,7 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
     traverse: function(visitor) {
 
         if (visitor.modelviewMatrixStack !== undefined) { // i.e., in cull visitor
+
             var eye = this.getEyePoint(visitor);
 
             var centerToEye = [];
@@ -652,6 +636,10 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
             osg.Vec3.normalize(centerToEye, centerToEye);
 
             if (this.key[2] == 0 || osg.Vec3.dot(centerToEye, this.centerNormal) >= this.deviation) {
+
+                // tell the map we're drawing this tile (so it doesn't get exipred)
+                this.map.markTileDrawn(this);
+
                 var bound = this.getBound();
                 var range = osg.Vec3.length(osg.Vec3.sub(eye, bound.center(), []));
 

@@ -50,6 +50,7 @@
 <title>Godzi WebGL</title>
 
 <meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+
 <script type="text/javascript" src="../js/jquery/jquery-1.4.2.js"></script>
 <script type="text/javascript" src="../js/godzi.js"></script>
 
@@ -63,6 +64,12 @@
         map.addImageLayer(new godzi.TMSImageLayer({
             name: "Landsat",
             url: "http://readymap.org/readymap/tiles/1.0.0/22/",
+            tmsType: "google"
+        }));
+
+        map.addImageLayer(new godzi.TMSImageLayer({
+            name: "OSM",
+            url: "http://readymap.org/readymap/tiles/1.0.0/35/",
             tmsType: "google"
         }));
 
@@ -85,7 +92,7 @@
                 "Lat: " + lla[1].toFixed(2) + "\u00B0" + "  Long = " + lla[0].toFixed(2) + "\u00B0" + "<br/>" +
                 "Azim: " + osgearth.rad2deg(mapView.viewer.manipulator.localAzim).toFixed(1) + "\u00B0" +
                 "  Pitch:" + osgearth.rad2deg(mapView.viewer.manipulator.localPitch).toFixed(1) + "\u00B0");
-        };
+        }
     });
 
 </script>

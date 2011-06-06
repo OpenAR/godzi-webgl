@@ -12,7 +12,7 @@ godzi.Map = function() {
 godzi.Map.prototype = osg.objectInehrit(osgearth.Map.prototype, {
 });
 
-//------------
+//...................................................................
 
 godzi.TMSImageLayer = function(settings) {
     osgearth.ImageLayer.call(this, settings.name);
@@ -39,6 +39,13 @@ godzi.TMSImageLayer.prototype = {
     createTexture: function(key, profile) {
         var imageURL = this.getURL(key, profile);
         return osgearth.Texture.create(imageURL);
-        //return osg.Texture.create(imageURL);
     }
+};
+
+//...................................................................
+
+godzi.ArcGISImageLayer = function(settings) {
+    osgearth.ImageLayer.call(this, settings.name);
+    this.url = settings.url;
+    
 };
