@@ -47,7 +47,8 @@
     {
          clear: both;
          width: 300px;
-         background: #c60;     
+         padding: 5;
+         margin: 5;
     }
     
 	.opacity-slider {
@@ -118,6 +119,7 @@ function toggleVisiblity() {
         }
         
         layerSwitcher = new godzi.controls.LayerSwitcher("LayerSwitcher", map);               
+        jQuery("#LayerSwitcher").draggable();
     });
     
 
@@ -145,7 +147,7 @@ function toggleVisiblity() {
       <li>space to reset</li>
     </ul>
     
-    <div id="LayerSwitcher">
+    <div id="LayerSwitcher" class="ui-widget-content">
     </div>
     
     <!--<button onclick="toggleVisiblity();">Toggle Visiblity</button>-->
