@@ -22,7 +22,7 @@ godzi.TMSImageLayer = function(settings) {
     this.baseLevel = settings.baseLevel !== undefined ? settings.baseLevel : 0;
 };
 
-godzi.TMSImageLayer.prototype = {
+godzi.TMSImageLayer.prototype = osg.objectInehrit(osgearth.ImageLayer.prototype, {
 
     getURL: function(key, profile) {
         var y = key[1];
@@ -40,7 +40,7 @@ godzi.TMSImageLayer.prototype = {
         var imageURL = this.getURL(key, profile);
         return osgearth.Texture.create(imageURL);
     }
-};
+});
 
 //...................................................................
 

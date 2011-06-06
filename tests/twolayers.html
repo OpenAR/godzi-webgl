@@ -56,10 +56,17 @@
 
 <script type="text/javascript">
 
+var map;
+
+function toggleVisiblity() {
+  //map.imageLayers[1].setVisible(!map.imageLayers[1].getVisible());
+  map.imageLayers[1].setOpacity(0.2);
+}
+
     godzi.init("../js/", function() {
 
         // create a map model:
-        var map = new godzi.Map();
+        map = new godzi.Map();
 
         map.addImageLayer(new godzi.TMSImageLayer({
             name: "Landsat",
@@ -118,7 +125,10 @@
       <li>shift-drag to rotate</li>
       <li>space to reset</li>
     </ul>
+    
+    <button onclick="toggleVisiblity();">Toggle Visiblity</button>
   </div>
+ 
   <div id="Coords">
   </div>
 </body>
