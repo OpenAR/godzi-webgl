@@ -1,0 +1,155 @@
+<html>
+<head>
+
+<style>
+    body {
+        background: black;
+        overflow:hidden;
+        padding:0;
+        margin:0;
+        color: white;
+    }
+    
+    #header 
+    {
+        margin: 0;
+        padding: 5;
+        background: #c60;
+        color: #fff;
+        font-family: Arial;
+        font-weight: bold;
+    }    
+
+    #ViewContainer 
+    {
+        clear: both;
+        position: absolute;
+    }
+    
+    #Help
+    {
+        float:left;
+        position:absolute;
+        z-index:10;
+        margin-left: 5;
+    }
+    
+    #Coords
+    {
+	    float: right;
+        position: absolute;
+		bottom: 2px;
+		right: 2px;
+        z-index: 10;
+        margin: 2;
+        padding: 2;
+    }
+
+    #Search
+    {
+	    float: right;
+		clear: both;
+		position: relative;
+		z-index: 10;
+		margin: 2;
+		padding: 2;
+	}
+	
+	#InputSearch
+	{
+	    font-size: 0.75em;
+		color: #fff;
+		background-color: #000;
+		opacity: 0.6;
+		border: 1px solid #999;
+		padding: 1px 2px;
+	}
+    
+    a { color: #ffffff; }
+    
+</style>
+
+<title>Godzi WebGL</title>
+
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+
+<script type="text/javascript" src="../js/jquery/jquery-1.4.2.js"></script>
+<script type="text/javascript" src="../js/godzi.js"></script>
+
+<script type="text/javascript">
+
+    godzi.init("../js/", function() {
+
+        // create a map model:
+        var map = new godzi.Map();
+
+        map.addImageLayer(new godzi.TMSImageLayer({
+            name: "Landsat",
+            url: "http://readymap.org/readymap/tiles/1.0.0/22/",
+            tmsType: "google"
+        }));
+
+        map.addImageLayer(new godzi.TMSImageLayer({
+            name: "OSM",
+            url: "http://readymap.org/readymap/tiles/1.0.0/35/",
+            tmsType: "google"
+        }));
+
+        // create a view tied to a page element:
+        var size = godzi.getWindowSize();
+        var headerHeight = jQuery('#header').height();
+        size.h -= headerHeight;
+        mapView = new godzi.MapView("3DView", size, map);
+
+        // display the Lat/Long:
+        mapView.onFrameEnd = function() {
+            var viewMatrix = mapView.viewer.view.getViewMatrix();
+            viewMatrix = osg.Matrix.inverse(viewMatrix);
+            var eye = [];
+            osg.Matrix.getTrans(viewMatrix, eye);
+            var lla = map.profile.ellipsoid.ecef2lla(eye);
+            lla[0] = osgearth.rad2deg(lla[0]);
+            lla[1] = osgearth.rad2deg(lla[1]);
+            jQuery("#Coords").html(
+                "Lat: " + lla[1].toFixed(2) + "\u00B0" + "  Long = " + lla[0].toFixed(2) + "\u00B0" + "<br/>" +
+                "Azim: " + osgearth.rad2deg(mapView.viewer.manipulator.localAzim).toFixed(1) + "\u00B0" +
+                "  Pitch:" + osgearth.rad2deg(mapView.viewer.manipulator.localPitch).toFixed(1) + "\u00B0");
+        }
+		
+		var placeSearch = new godzi.PlaceSearch("Search", "InputSearch", function(lat, lon, swlat, swlon, nelat, nelon) {
+		  var range = ((.5 * (nelat - swlat)) / 0.267949849) * 111000.0;
+		  mapView.viewer.manipulator.setViewpoint(lat, lon, 0.0, 0, -90, range);
+		});
+    });
+
+</script>
+</head>
+
+<body>
+  <div id="header">
+    <a href="http://pelicanmapping.com" border="0"><img id="logo" align="right" height="50" src="http://pelicanmapping.com/wp-content/uploads/2011/02/pelican-logo-262x93-light.png" /></a>
+    <p>
+        Godzi / WebGL :: 
+        <a href="http://godzi.org">wiki</a> :: 
+        <a href="http://github.com/gwaldron/godzi-webgl">github</a> ::
+        <a href="http://twitter.com/#!/pelicanmapping">twitter</a>
+    </p>
+  </div>
+  <div id="ViewContainer">
+    <canvas id="3DView"></canvas>
+  </div>
+  <div id="Help">
+    <ul>
+      <li>drag to pan</li>
+      <li>wheel to zoom</li>
+      <li>shift-drag to rotate</li>
+      <li>space to reset</li>
+    </ul>
+  </div>
+  <div id="Search">
+  </div>
+  <div id="Coords">
+  </div>
+</body>
+
+</html>
