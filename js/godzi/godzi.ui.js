@@ -12,87 +12,6 @@
 
 //........................................................................
 
-// eventually add all this stuff to osgjs:
-
-osg.Quat.zeroRotation = function(q) {
-    return q[0]==0 && q[1]==0 & q[2]==0 && q[3]==1;
-};
-
-// osgjs's Quat.mult backwards?
-osg.Quat.multiply = function(a,b,r) {
-    if ( r === undefined )
-       r = [];
-    return osg.Quat.mult(b,a,r);
-}
-
-osg.Quat.rotateVecOnToVec = function(from, to, r) {
-    if (r === undefined)
-        r = [];
-
-    var sourceVector = osg.Vec3.copy(from, []);
-    var targetVector = osg.Vec3.copy(to, []);
-
-    var fromLen2 = osg.Vec3.length2(from);
-    var fromLen = 0;
-    if (fromLen2 < 1 - 1e-7 || fromLen2 > 1 + 1e-7) {
-        fromLen = Math.sqrt(fromLen2);
-        sourceVector = osg.Vec3.mult(sourceVector, 1.0 / fromLen, []);
-    }
-
-    var toLen2 = osg.Vec3.length2(to);
-    if (toLen2 < 1 - 1e-7 || toLen2 > 1 + 1e-7) {
-        var toLen = 0;
-        if (toLen2 > fromLen2 - 1e-7 && toLen2 < fromLen2 + 1e-7) {
-            toLen = fromLen;
-        }
-        else {
-            toLen = Math.sqrt(toLen2);
-        }
-        targetVector = osg.Vec3.mult(targetVector, 1.0 / toLen, []);
-    }
-
-    var dotProdPlus1 = 1.0 + osg.Vec3.dot(sourceVector, targetVector);
-
-    if (dotProdPlus1 < 1e-7) {
-        if (Math.abs(sourceVector[0]) < 0.6) {
-            var norm = Math.sqrt(1.0 - sourceVector[0] * sourceVector[0]);
-            r[0] = 0.0;
-            r[1] = sourceVector[2] / norm;
-            r[2] = -sourceVector[1] / norm;
-            r[3] = 0.0;
-        }
-        else if (Math.abs(sourceVector[1]) < 0.6) {
-            var norm = Math.sqrt(1.0 - sourceVector[1] * sourceVector[1]);
-            r[0] = -sourceVector[2] / norm;
-            r[1] = 0.0;
-            r[2] = sourceVector[0] / norm;
-            r[3] = 0.0;
-        }
-        else {
-            var norm = Math.sqrt(1.0 - sourceVector[2] * sourceVector[2]);
-            r[0] = sourceVector[1] / norm;
-            r[1] = -sourceVector[0] / norm;
-            r[2] = 0.0;
-            r[3] = 0.0;
-        }
-    }
-
-    else {
-        // Find the shortest angle quaternion that transforms normalized vectors
-        // into one other. Formula is still valid when vectors are colinear
-        var s = Math.sqrt(0.5 * dotProdPlus1);
-        var tmp = osg.Vec3.cross(sourceVector, osg.Vec3.mult(targetVector, 1.0 / (2.0 * s)), []);
-        r[0] = tmp[0];
-        r[1] = tmp[1];
-        r[2] = tmp[2];
-        r[3] = s;
-    }
-
-    return r;
-};
-
-//........................................................................
-
 godzi.Manipulator = function(map) {
     this.map = map;
     this.center = [0, 0, 0];
@@ -152,8 +71,8 @@ godzi.Manipulator.prototype = {
 
 godzi.EarthManipulator = function(map) {
     godzi.Manipulator.call(this, map);
-    this.minPitch = osgearth.deg2rad(-89.9);
-    this.maxPitch = osgearth.deg2rad(-10.0);
+    this.minPitch = Math.deg2rad(-89.9);
+    this.maxPitch = Math.deg2rad(-10.0);
     this.buttonup = true;
     this.centerRotation = osg.Quat.makeIdentity();
     this.lockAzimWhilePanning = true;
@@ -384,11 +303,11 @@ godzi.EarthManipulator.prototype = osg.objectInehrit( godzi.Manipulator.prototyp
     },
 
     setViewpoint: function(lat, lon, alt, heading, pitch, range) {
-        var lla = [osgearth.deg2rad(lon), osgearth.deg2rad(lat), alt];
+        var lla = [Math.deg2rad(lon), Math.deg2rad(lat), alt];
         this.center = this.map.profile.ellipsoid.lla2ecef(lla);
 
-        var newPitch = osgearth.clamp(osgearth.deg2rad(pitch), this.minPitch, this.maxPitch);
-        var newAzim = this.normalizeAzimRad(osgearth.deg2rad(heading));
+        var newPitch = Math.clamp(Math.deg2rad(pitch), this.minPitch, this.maxPitch);
+        var newAzim = this.normalizeAzimRad(Math.deg2rad(heading));
 
         this.setDistance(range);
 
@@ -483,6 +402,13 @@ godzi.MapManipulator.prototype = osg.objectInehrit(godzi.Manipulator.prototype, 
     mousewheel: function(ev, intDelta, deltaX, deltaY) {
         this.zoomModel(0, intDelta * 0.1);
     },
+
+    keydown: function(ev) {
+        if (ev.keyCode === 32) { // spacebar
+            this.computeHomePosition();
+        }
+    },
+
 } );
 
 //........................................................................

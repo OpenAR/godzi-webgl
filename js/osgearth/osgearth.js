@@ -7,6 +7,90 @@
 
 var osgearth = {};
 
+//........................................................................
+
+// OSG extensions ... 
+// eventually submit all this stuff to osgjs:
+
+osg.Quat.zeroRotation = function(q) {
+    return q[0] == 0 && q[1] == 0 & q[2] == 0 && q[3] == 1;
+};
+
+// osgjs's Quat.mult backwards?
+osg.Quat.multiply = function(a, b, r) {
+    if (r === undefined)
+        r = [];
+    return osg.Quat.mult(b, a, r);
+}
+
+osg.Quat.rotateVecOnToVec = function(from, to, r) {
+    if (r === undefined)
+        r = [];
+
+    var sourceVector = osg.Vec3.copy(from, []);
+    var targetVector = osg.Vec3.copy(to, []);
+
+    var fromLen2 = osg.Vec3.length2(from);
+    var fromLen = 0;
+    if (fromLen2 < 1 - 1e-7 || fromLen2 > 1 + 1e-7) {
+        fromLen = Math.sqrt(fromLen2);
+        sourceVector = osg.Vec3.mult(sourceVector, 1.0 / fromLen, []);
+    }
+
+    var toLen2 = osg.Vec3.length2(to);
+    if (toLen2 < 1 - 1e-7 || toLen2 > 1 + 1e-7) {
+        var toLen = 0;
+        if (toLen2 > fromLen2 - 1e-7 && toLen2 < fromLen2 + 1e-7) {
+            toLen = fromLen;
+        }
+        else {
+            toLen = Math.sqrt(toLen2);
+        }
+        targetVector = osg.Vec3.mult(targetVector, 1.0 / toLen, []);
+    }
+
+    var dotProdPlus1 = 1.0 + osg.Vec3.dot(sourceVector, targetVector);
+
+    if (dotProdPlus1 < 1e-7) {
+        if (Math.abs(sourceVector[0]) < 0.6) {
+            var norm = Math.sqrt(1.0 - sourceVector[0] * sourceVector[0]);
+            r[0] = 0.0;
+            r[1] = sourceVector[2] / norm;
+            r[2] = -sourceVector[1] / norm;
+            r[3] = 0.0;
+        }
+        else if (Math.abs(sourceVector[1]) < 0.6) {
+            var norm = Math.sqrt(1.0 - sourceVector[1] * sourceVector[1]);
+            r[0] = -sourceVector[2] / norm;
+            r[1] = 0.0;
+            r[2] = sourceVector[0] / norm;
+            r[3] = 0.0;
+        }
+        else {
+            var norm = Math.sqrt(1.0 - sourceVector[2] * sourceVector[2]);
+            r[0] = sourceVector[1] / norm;
+            r[1] = -sourceVector[0] / norm;
+            r[2] = 0.0;
+            r[3] = 0.0;
+        }
+    }
+
+    else {
+        // Find the shortest angle quaternion that transforms normalized vectors
+        // into one other. Formula is still valid when vectors are colinear
+        var s = Math.sqrt(0.5 * dotProdPlus1);
+        var tmp = osg.Vec3.cross(sourceVector, osg.Vec3.mult(targetVector, 1.0 / (2.0 * s)), []);
+        r[0] = tmp[0];
+        r[1] = tmp[1];
+        r[2] = tmp[2];
+        r[3] = s;
+    }
+
+    return r;
+};
+
+//........................................................................
+
 osgearth.copyright = '(c) Copyright 2011 Pelican Mapping - http://pelicanmapping.com';
 osgearth.instance = 0;
 osgearth.version = '0.0.1';
@@ -18,13 +102,15 @@ osgearth.log = function(str) {
     }
 };
 
-osgearth.deg2rad = function(deg) {
+Math.deg2rad = function(deg) {
     return deg * 0.0174532925;
 }
-osgearth.rad2deg = function(rad) {
+
+Math.rad2deg = function(rad) {
     return rad * 57.2957795;
 }
-osgearth.clamp = function(x, min, max) {
+
+Math.clamp = function(x, min, max) {
     if (x < min)
         return min;
     else if (x > max)
@@ -54,8 +140,8 @@ osgearth.Extent = {
         return [(extent.xmin + extent.xmax) / 2, (extent.ymin + extent.ymax) / 2];
     },
     clamp: function(extent, vec2) {
-        vec2[0] = osgearth.clamp( vec2[0], extent.xmin, extent.xmax );
-        vec2[1] = osgearth.clamp( vec2[1], extent.ymin, extent.ymax );
+        vec2[0] = Math.clamp( vec2[0], extent.xmin, extent.xmax );
+        vec2[1] = Math.clamp(vec2[1], extent.ymin, extent.ymax);
     }
 };
 
@@ -203,9 +289,9 @@ osgearth.MercatorProfile.prototype = osg.objectInehrit(osgearth.Profile.prototyp
 
     getUV: function(localExtentLLA, lla) {
         var u = (lla[0] - localExtentLLA.xmin) / osgearth.Extent.width(localExtentLLA);
-        var vmin = this.lat2v(osgearth.clamp(localExtentLLA.ymax, this.extentLLA.ymin, this.extentLLA.ymax));
-        var vmax = this.lat2v(osgearth.clamp(localExtentLLA.ymin, this.extentLLA.ymin, this.extentLLA.ymax));
-        var vlat = this.lat2v(osgearth.clamp(lla[1], this.extentLLA.ymin, this.extentLLA.ymax));
+        var vmin = this.lat2v(Math.clamp(localExtentLLA.ymax, this.extentLLA.ymin, this.extentLLA.ymax));
+        var vmax = this.lat2v(Math.clamp(localExtentLLA.ymin, this.extentLLA.ymin, this.extentLLA.ymax));
+        var vlat = this.lat2v(Math.clamp(lla[1], this.extentLLA.ymin, this.extentLLA.ymax));
         var v = 1.0 - (vlat - vmin) / (vmax - vmin);
         return [u, v];
     },
@@ -323,69 +409,18 @@ osgearth.Texture = function() {
         str += "else {\n";
         str += "  texColor" + unit + " = vec4(1,0,0,1);\n";
         str += "};\n";                
-        str += "  fragColor = vec4(mix(fragColor.rgb,texColor" + unit + ".rgb,texColor" + unit + ".a),1);\n";            
+        str += "  fragColor = vec4(mix(fragColor.rgb,texColor" + unit + ".rgb,texColor" + unit + ".a),1);\n";
         return str;        
     };
     this.setShaderGeneratorFunction(fragMain, osg.ShaderGeneratorType.FragmentMain);
 };
 
 osgearth.Texture.prototype = osg.objectInehrit(osg.Texture.prototype, {
-    cloneType: function() { var t = new osgearth.Texture(); t.default_type = true; return t; }
-    
-    /*
-=======
-    cloneType: function() { var t = new osgearth.Texture(); t.default_type = true; return t; },
-    
-    writeToShader: function(unit, type) {
-        var str = "";
-        switch (type) {
-            case osg.ShaderGeneratorType.VertexInit:
-                str = "attribute vec2 TexCoord" + unit + ";\n";
-                str += "varying vec2 FragTexCoord" + unit + ";\n";
-                break;
-            case osg.ShaderGeneratorType.VertexMain:
-                str = "FragTexCoord" + unit + " = TexCoord" + unit + ";\n";
-                break;
-            case osg.ShaderGeneratorType.FragmentInit:
-                str = "varying vec2 FragTexCoord" + unit + ";\n";
-                str += "uniform sampler2D Texture" + unit + ";\n";
-                str += "vec4 texColor" + unit + ";\n";
-                str += "uniform bool Texture" + unit + "Visible;\n";
-                break;
-            case osg.ShaderGeneratorType.FragmentMain:
-                str = "if (Texture" + unit + "Visible){\n";                
-//                str =  " if (true) {\n";
-                str += "  texColor" + unit + " = texture2D( Texture" + unit + ", FragTexCoord" + unit + ".xy );\n";
-                str += "}\n";
-                str += "else {\n";
-                str += "  texColor" + unit + " = vec4(1,0,0,1);\n";
-                str += "};\n";                
-                str += "  fragColor = vec4(mix(fragColor.rgb,texColor" + unit + ".rgb,texColor" + unit + ".a),1);\n";            
-                // hack to prevent the default ShaderGenerator code from overriding our mix:
-                str += "texColor" + unit + " = vec4(1,1,1,1);\n";
-                break;
-        }
-        return str;
-    },
-    */
-    
-   /*
-   getOrCreateUniforms: function(unit) {
-        if (osg.Texture.uniforms === undefined) {
-            osg.Texture.uniforms = [];
-        }
-        if (osg.Texture.uniforms[unit] === undefined) {
-            var name = this.getType() + unit;
-            var uniforms = {};
-            uniforms[name] = osg.Uniform.createInt1(unit, name);
-            uniforms[name + "Visible"] = osg.Uniform.createInt1(true, name + "Visible");
-            var uniformKeys = [name, name + "Visible"];
-            uniforms.uniformKeys = uniformKeys;
-
-            osg.Texture.uniforms[unit] = uniforms;                        
-        }
-        return osg.Texture.uniforms[unit];
-    },*/
+    cloneType: function() { 
+        var t = new osgearth.Texture(); 
+        t.default_type = true; 
+        return t;
+    }
 });
 
 osgearth.Texture.create = function(imageSource) {
@@ -521,9 +556,9 @@ osgearth.Map.prototype = {
             osg.Shader.create(gl.FRAGMENT_SHADER, this.getFragmentShader())
         );      
         node.getOrCreateStateSet().setAttributeAndMode( program, osg.StateAttribute.ON | osg.StateAttribute.OVERRIDE );
-        node.getOrCreateStateSet().addUniform(osg.Uniform.createInt1(0, "Texture0"));
-        node.getOrCreateStateSet().addUniform(osg.Uniform.createInt1(1, "Texture1"));               
-        
+//        node.getOrCreateStateSet().addUniform(osg.Uniform.createInt1(0, "Texture0"));
+//        node.getOrCreateStateSet().addUniform(osg.Uniform.createInt1(1, "Texture1"));        
+//        
         return node;
     },
 
