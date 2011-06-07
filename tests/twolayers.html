@@ -100,7 +100,7 @@ var mapView;
         mapView = new godzi.MapView("3DView", size, map);
 
         // display the Lat/Long:
-        mapView.onFrameEnd = function() {
+        mapView.addFrameEndCallback( function() {
             var viewMatrix = mapView.viewer.view.getViewMatrix();
             viewMatrix = osg.Matrix.inverse(viewMatrix);
             var eye = [];
@@ -112,7 +112,7 @@ var mapView;
                 "Lat: " + lla[1].toFixed(2) + "\u00B0" + "  Long = " + lla[0].toFixed(2) + "\u00B0" + "<br/>" +
                 "Azim: " + osgearth.rad2deg(mapView.viewer.manipulator.localAzim).toFixed(1) + "\u00B0" +
                 "  Pitch:" + osgearth.rad2deg(mapView.viewer.manipulator.localPitch).toFixed(1) + "\u00B0");
-        }
+        });
         
         layerSwitcher = new godzi.controls.LayerSwitcher("LayerSwitcher", map);               
         jQuery("#LayerSwitcher").draggable();
