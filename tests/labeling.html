@@ -1,0 +1,194 @@
+<html>
+<head>
+
+<style>
+    body {
+        background: black;
+        overflow:hidden;
+        padding:0;
+        margin:0;
+        color: white;
+    }
+    
+    #header 
+    {
+        margin: 0;
+        padding: 5;
+        background: #c60;
+        color: #fff;
+        font-family: Arial;
+        font-weight: bold;
+    }    
+
+    #ViewContainer 
+    {
+        clear: both;
+        position: absolute;
+    }
+    
+    #Help
+    {
+        float:left;
+        position:absolute;
+        z-index:10;
+        margin-left: 5;
+    }
+    
+    #Coords
+    {
+        float: right;
+        position: relative;
+        z-index: 10;
+        margin: 2;
+        padding: 2;
+    }
+    
+    #LayerSwitcher
+    {
+         clear: both;
+         width: 300px;
+         padding: 5;
+         margin: 5;
+    }
+    
+	.opacity-slider {
+      margin: 0.2em 1em 0.2em 1em;
+	}
+	
+	.low-population {
+	  color: ff0000;
+	}
+	
+	.high-population {
+	  color: 00ff00;
+	  font-weight:bold;
+	  font-size: 120%;
+	}
+		    
+    a { color: #ffffff; }
+    
+</style>
+
+<title>Godzi WebGL</title>
+
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+
+<script type="text/javascript" src="../js/jquery/jquery-1.4.2.js"></script>
+<script type="text/javascript" src="../js/jquery/jquery-ui-1.8.2.custom.min.js"></script>
+<script type="text/javascript" src="../js/godzi.js"></script>
+<script type="text/javascript" src="../js/data/country_data.js"></script>
+
+<link href="../css/ui-lightness/jquery.ui.all.css" rel="stylesheet" type="text/css"></link>
+
+<script type="text/javascript">
+
+var map;
+var layerSwitcher;
+var mapView;
+var positionEngine;
+
+
+
+
+    godzi.init("../js/", function() {
+
+        // create a map model:
+        map = new godzi.Map();
+
+        map.addImageLayer(new godzi.TMSImageLayer({
+            name: "Landsat",
+            url: "http://readymap.org/readymap/tiles/1.0.0/22/",
+            tmsType: "google"
+        }));
+
+        map.addImageLayer(new godzi.TMSImageLayer({
+            name: "OSM",
+            url: "http://readymap.org/readymap/tiles/1.0.0/35/",
+            tmsType: "google"
+        }));
+
+        // create a view tied to a page element:
+        var size = godzi.getWindowSize();
+        var headerHeight = jQuery('#header').height();
+        size.h -= headerHeight;
+        mapView = new godzi.MapView("3DView", size, map);
+
+        // display the Lat/Long:
+        mapView.addFrameEndCallback( function() {
+            var viewMatrix = mapView.viewer.view.getViewMatrix();
+            viewMatrix = osg.Matrix.inverse(viewMatrix);
+            var eye = [];
+            osg.Matrix.getTrans(viewMatrix, eye);
+            var lla = map.profile.ellipsoid.ecef2lla(eye);
+            lla[0] = osgearth.rad2deg(lla[0]);
+            lla[1] = osgearth.rad2deg(lla[1]);
+            jQuery("#Coords").html(
+                "Lat: " + lla[1].toFixed(2) + "\u00B0" + "  Long = " + lla[0].toFixed(2) + "\u00B0" + "<br/>" +
+                "Azim: " + osgearth.rad2deg(mapView.viewer.manipulator.localAzim).toFixed(1) + "\u00B0" +
+                "  Pitch:" + osgearth.rad2deg(mapView.viewer.manipulator.localPitch).toFixed(1) + "\u00B0");            
+        });
+        
+        positionEngine = new godzi.PositionEngine( mapView );
+        
+        var addedLabels = [];
+        
+               
+//        for (var i = 0; i < country_data.features.length; i++) {
+        for (var i = 0; i < 1000; i++) {
+          var f = country_data.features[i];
+          var name = f.properties.NAME;
+          if (addedLabels[name] === undefined) {
+          
+            var population = f.properties.POP;
+            var lon = f.geometry.coordinates[0];
+            var lat = f.geometry.coordinates[1];
+            var class = "low-population";
+            if (population > 100000) {
+              class = "high-population";
+            }
+            var label = new godzi.Label("label" + i, osgearth.deg2rad(lon), osgearth.deg2rad(lat), 0, name, {
+              class: class
+            });
+            positionEngine.elements.push( label );          
+            addedLabels[name] = true;
+          }
+        }
+    });
+    
+
+</script>
+</head>
+
+<body>
+  <div id="header">
+    <a href="http://pelicanmapping.com" border="0"><img id="logo" align="right" height="50" src="http://pelicanmapping.com/wp-content/uploads/2011/02/pelican-logo-262x93-light.png" /></a>
+    <p>
+        Godzi / WebGL :: 
+        <a href="http://godzi.org">wiki</a> :: 
+        <a href="http://github.com/gwaldron/godzi-webgl">github</a> ::
+        <a href="http://twitter.com/#!/pelicanmapping">twitter</a>
+    </p>
+    <div id="toolbar">
+      <image src="../images/globe.gif" onclick="mapView.home();"/>
+    </div>
+  </div>
+  <div id="ViewContainer">
+    <canvas id="3DView"></canvas>
+  </div>
+  <div id="Help">
+    <ul>
+      <li>drag to pan</li>
+      <li>wheel to zoom</li>
+      <li>shift-drag to rotate</li>
+      <li>space to reset</li>
+    </ul>      
+    
+   
+  </div>
+ 
+  <div id="Coords">
+  </div>
+    
+</body>
+
+</html>

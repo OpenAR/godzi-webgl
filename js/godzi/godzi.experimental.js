@@ -78,3 +78,115 @@ godzi.PlaceSearch.doSearch = function(place, callback)
 };
 
 //........................................................................
+
+godzi.PositionedElement = function(id, lon, lat, alt) {
+  this.id = id;
+  this.element = jQuery("#" + id);
+  this.lat = lat;
+  this.lon = lon;
+  this.alt = alt;
+  this.offset = [0,0];
+}
+
+godzi.PositionedElement.prototype = {  
+  update : function(mapView) {
+      var ecf = mapView.map.lla2world([this.lon, this.lat, this.alt]);
+      var window = mapView.projectObjectIntoWindow(ecf);
+          
+      this.element.position( {        
+        my: "left top",
+        at: "left top",
+        of: mapView.viewer.canvas,
+        offset: window[0] + " " + window[1]
+      });      
+  }
+}
+
+
+godzi.Icon = function(id, lon, lat, alt, url, options) {  
+  godzi.PositionedElement.call(this, id, lon, lat, alt);    
+  this.url = url;
+    
+  var defaults = {
+    width: 64,
+    height: 64,
+    class: ""
+  };
+ 
+  
+  var options = jQuery.extend({}, defaults, options);
+  
+  this.width = options.width;
+  this.height = options.height;
+  this.class = options.class;
+  
+  this.element = jQuery('<img id="' + this.id + '" class="' + options.class + '" src="' + url + '" width="' + this.width + '" height="' + this.height + '"/>');
+  jQuery("body").append(this.element);                         
+}
+
+godzi.Icon.prototype = osg.objectInehrit(godzi.PositionedElement.prototype, {
+ getWidth : function() {
+   return this.width;
+ },
+ 
+ setWidth: function(width) {
+   setSize(width, this.height);
+ }, 
+  
+ getHeight : function() {
+   return this.height;
+ },
+ 
+  setHeight: function(height) {
+    setSize(this.width, height);
+  },
+ 
+ setSize: function(width, height) {
+   if (this.height != height || this.width != width) {
+     this.width = width;
+     this.height = height;
+     this.element.attr('height', this.height);
+     this.element.attr('width', this.width);
+   }
+ }
+ 
+ 
+});
+
+godzi.Label = function(id, lon, lat, alt, text, options) {  
+  godzi.PositionedElement.call(this, id, lon, lat, alt);    
+  this.text = text;
+    
+  var defaults = {
+    class: ""
+  };
+ 
+  
+  var options = jQuery.extend({}, defaults, options);
+  
+  this.class = options.class;
+  
+  this.element = jQuery('<span id="' + this.id + '" class="' + options.class + '">' + this.text + '</span>');
+  jQuery("body").append(this.element);                         
+}
+
+godzi.Label.prototype = osg.objectInehrit(godzi.PositionedElement.prototype, {
+ 
+});
+
+godzi.PositionEngine = function(mapView) {
+  this.mapView = mapView;
+  var me = this;
+  this.mapView.addFrameEndCallback( function() {
+    me.frameEnd();
+  } );
+  this.elements = [];
+}
+
+godzi.PositionEngine.prototype = {
+  frameEnd: function() {
+    for (var i = 0; i < this.elements.length; i++) {
+      this.elements[i].update(this.mapView);
+    }
+  }
+}
