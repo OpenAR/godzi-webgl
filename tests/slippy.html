@@ -32,6 +32,7 @@
         position:absolute;
         z-index:10;
         margin-left: 5;
+        color: Black;
     }
     
     #Coords
@@ -41,6 +42,7 @@
         z-index: 10;
         margin: 2;
         padding: 2;
+        color: Black;
     }
     
     a { color: #ffffff; }
@@ -85,11 +87,8 @@
             lla[0] = osgearth.rad2deg(lla[0]);
             lla[1] = osgearth.rad2deg(lla[1]);
             jQuery("#Coords").html(
-                "X: " + xy[0].toFixed(1) + ", " +
-                "Y: " + xy[1].toFixed(1) + "<br/>" +
                 "Lat: " + lla[1].toFixed(2) + "\u00B0" + "  Long = " + lla[0].toFixed(2) + "\u00B0" + "<br/>" +
-                "Distance: " + mapView.viewer.manipulator.distance.toFixed(1) + "<br/>" +
-                "Tiles: " + map.drawListSize);
+                "X: " + xy[0].toFixed(1) + "  Y: " + xy[1].toFixed(1) + "<br/>");
         }
     });
 
@@ -113,8 +112,6 @@
     <ul>
       <li>drag to pan</li>
       <li>wheel to zoom</li>
-      <li>shift-drag to rotate</li>
-      <li>space to reset</li>
     </ul>
   </div>
   <div id="Coords">
