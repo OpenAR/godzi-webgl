@@ -91,7 +91,39 @@ godzi.PositionedElement = function(id, lon, lat, alt) {
 godzi.PositionedElement.prototype = {  
   update : function(mapView) {
       var ecf = mapView.map.lla2world([this.lon, this.lat, this.alt]);
+      
+      //Cull elements on the other side of the earth.
+      var viewMatrix = mapView.viewer.view.getViewMatrix();
+      viewMatrix = osg.Matrix.inverse(viewMatrix);
+      var eye = [];      
+      osg.Matrix.getTrans(viewMatrix, eye);
+      //osg.Vec3.normalize(eye, eye);
+      
+      /*var m = mapView.viewer.view.getViewMatrix();
+      var eye = [];
+      var center = [];
+      var up = [];
+      osg.Matrix.getLookAt(m, eye, center, up );
+      */
+      
+      var lookVector = [];
+      osg.Vec3.sub( ecf, eye, lookVector );         
+      
+      var worldUp = [];
+      osg.Vec3.copy(ecf, worldUp);
+      osg.Vec3.normalize( worldUp, worldUp );
+      var dot = osg.Vec3.dot(lookVector, worldUp);
+      if (dot > 0) {
+        this.element.offset({top:0, left:-10000});
+        return;
+      }
+      
+      
+      
+     
       var window = mapView.projectObjectIntoWindow(ecf);
+      
+
       
       var x = (window[0] + this.offset[0]).toFixed();
       var y = (window[1] + this.offset[1]).toFixed();
