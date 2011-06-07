@@ -92,13 +92,28 @@ godzi.PositionedElement.prototype = {
   update : function(mapView) {
       var ecf = mapView.map.lla2world([this.lon, this.lat, this.alt]);
       var window = mapView.projectObjectIntoWindow(ecf);
+      
+      var x = (window[0] + this.offset[0]).toFixed();
+      var y = (window[1] + this.offset[1]).toFixed();
+     
+      
+      //Don't reposition this element if it hasn't changed
+      if (this.lastWindow !== undefined) {
+        var dx = this.lastWindow[0] - x;
+        var dy = this.lastWindow[1] - y;
+        if (dx == 0 && dy == 0) {
+            return;
+        } 
+      }
           
       this.element.position( {        
         my: "left top",
         at: "left top",
         of: mapView.viewer.canvas,
-        offset: (window[0] + this.offset[0]) + " " + (window[1] + this.offset[1])
+        offset: x + " " + y
       });      
+      
+      this.lastWindow = [x,y];            
   }
 }
 
