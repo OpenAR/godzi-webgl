@@ -97,7 +97,7 @@ godzi.PositionedElement.prototype = {
         my: "left top",
         at: "left top",
         of: mapView.viewer.canvas,
-        offset: window[0] + " " + window[1]
+        offset: (window[0] + this.offset[0]) + " " + (window[1] + this.offset[1])
       });      
   }
 }

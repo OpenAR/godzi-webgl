@@ -134,7 +134,7 @@ var positionEngine;
         
                
 //        for (var i = 0; i < country_data.features.length; i++) {
-        for (var i = 0; i < 1000; i++) {
+        for (var i = 0; i < 300; i++) {
           var f = country_data.features[i];
           var name = f.properties.NAME;
           if (addedLabels[name] === undefined) {
@@ -142,14 +142,25 @@ var positionEngine;
             var population = f.properties.POP;
             var lon = f.geometry.coordinates[0];
             var lat = f.geometry.coordinates[1];
-            var class = "low-population";
+            var class = "low-population";            
+            var icon_url = "http://google-maps-icons.googlecode.com/files/smallcity.png";
             if (population > 100000) {
               class = "high-population";
+              icon_url = "http://google-maps-icons.googlecode.com/files/bigcity.png";
             }
             var label = new godzi.Label("label" + i, osgearth.deg2rad(lon), osgearth.deg2rad(lat), 0, name, {
               class: class
             });
-            positionEngine.elements.push( label );          
+            //Offset the label so you can see the icon
+            label.offset = [34, 0];
+            positionEngine.elements.push( label );     
+           
+            
+            var icon = new godzi.Icon("icon" + i, osgearth.deg2rad(lon), osgearth.deg2rad(lat), 0, icon_url, {
+              width: 32,
+              height: 32
+            });
+            positionEngine.elements.push( icon );          
             addedLabels[name] = true;
           }
         }
