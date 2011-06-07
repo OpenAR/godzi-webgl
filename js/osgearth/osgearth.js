@@ -197,7 +197,7 @@ osgearth.MercatorProfile = function() {
 osgearth.MercatorProfile.prototype = osg.objectInehrit(osgearth.Profile.prototype, {
 
     getUV: function(localExtentLLA, lla) {
-        var u = (lla[0] - localExtentLLA.xmin) / localExtentLLA.width;
+        var u = (lla[0] - localExtentLLA.xmin) / osgearth.Extent.width(localExtentLLA);
         var vmin = this.lat2v(osgearth.clamp(localExtentLLA.ymax, this.extentLLA.ymin, this.extentLLA.ymax));
         var vmax = this.lat2v(osgearth.clamp(localExtentLLA.ymin, this.extentLLA.ymin, this.extentLLA.ymax));
         var vlat = this.lat2v(osgearth.clamp(lla[1], this.extentLLA.ymin, this.extentLLA.ymax));
@@ -211,34 +211,20 @@ osgearth.MercatorProfile.prototype = osg.objectInehrit(osgearth.Profile.prototyp
         return 0.5 - Math.log((1 + sinLat) / (1 - sinLat)) / (4 * Math.PI);
     },
 
-    // http://wiki.openstreetmap.org/wiki/Mercator
-    toLLA: function(coord) {
-    var lon = coord[0] / this.ellipsoid.radiusEquator;
-        var temp = this.ellipsoid.radiusPolar / this.ellipsoid.radiusEquator;
-        var e = Math.sqrt(1.0 - (temp * temp));
-        var lat = this.pj_phi2(Math.exp(0 - (coord[1] / this.ellipsoid.radiusEquator)), e);
-        return [lon, lat, coord[2] !== undefined ? coord[2] : 0];
+    fromLLA: function(lla) {
+        return [
+            lla[0] * this.ellipsoid.radiusEquator,
+            this.ellipsoid.absMaxMerc_m - this.lat2v(lla[1]) * 2 * this.ellipsoid.absMaxMerc_m,
+//            -this.ellipsoid.absMaxMerc_m + this.lat2v(lla[1]) * 2 * this.ellipsoid.absMaxMerc_m,
+            lla[2]];
     },
 
-    // http://wiki.openstreetmap.org/wiki/Mercator
-    pj_phi2: function(ts, e) {
-        var N_ITER = 15;
-        var HALFPI = Math.PI / 2;
-        var TOL = 0.0000000001;
-        var eccnth, Phi, con, dphi;
-        var i;
-        var eccnth = .5 * e;
-        Phi = HALFPI - 2. * Math.atan(ts);
-        i = N_ITER;
-        do {
-            con = e * Math.sin(Phi);
-            dphi = HALFPI - 2. * Math.atan(ts * Math.pow((1. - con) / (1. + con), eccnth)) - Phi;
-            Phi += dphi;
-        }
-        while (Math.abs(dphi) > TOL && --i);
-        return Phi;
+    toLLA: function(coord) {
+        return [
+            coord[0] / this.ellipsoid.radiusEquator,
+            2 * Math.atan(Math.exp(coord[1]/this.ellipsoid.radiusEquator)) - Math.PI / 2,
+            coord[2]];
     }
-
 });
 
 //...................................................................
@@ -311,36 +297,20 @@ osgearth.TileKey = {
  * Custom texture class that customizes the fragment shader
  */
 osgearth.Texture = function() {
+
     osg.Texture.call(this);
+
+    var fragGen = function(unit) {
+        str = "texColor" + unit + " = texture2D( Texture" + unit + ", FragTexCoord" + unit + ".xy );\n";
+        str += "fragColor = vec4(mix(fragColor.rgb,texColor" + unit + ".rgb,texColor" + unit + ".a),1);\n";
+        return str;
+    };
+
+    this.setShaderGeneratorFunction(fragGen, osg.ShaderGeneratorType.FragmentMain);
 };
 
 osgearth.Texture.prototype = osg.objectInehrit(osg.Texture.prototype, {
-    cloneType: function() { var t = new osgearth.Texture(); t.default_type = true; return t; },
-    
-    writeToShader: function(unit, type) {
-        var str = "";
-        switch (type) {
-            case osg.ShaderGeneratorType.VertexInit:
-                str = "attribute vec2 TexCoord" + unit + ";\n";
-                str += "varying vec2 FragTexCoord" + unit + ";\n";
-                break;
-            case osg.ShaderGeneratorType.VertexMain:
-                str = "FragTexCoord" + unit + " = TexCoord" + unit + ";\n";
-                break;
-            case osg.ShaderGeneratorType.FragmentInit:
-                str = "varying vec2 FragTexCoord" + unit + ";\n";
-                str += "uniform sampler2D Texture" + unit + ";\n";
-                str += "vec4 texColor" + unit + ";\n";
-                break;
-            case osg.ShaderGeneratorType.FragmentMain:
-                str = "texColor" + unit + " = texture2D( Texture" + unit + ", FragTexCoord" + unit + ".xy );\n";
-                str += "fragColor = vec4(mix(fragColor.rgb,texColor" + unit + ".rgb,texColor" + unit + ".a),1);\n";
-                // hack to prevent the default ShaderGenerator code from overriding our mix:
-                str += "texColor" + unit + " = vec4(1,1,1,1);\n";
-                break;
-        }
-        return str;
-    }
+    cloneType: function() { var t = new osgearth.Texture(); t.default_type = true; return t; }
 });
 
 osgearth.Texture.create = function(imageSource) {
@@ -372,14 +342,24 @@ osgearth.ImageLayer.prototype = {
 osgearth.Map = function() {
     this.profile = new osgearth.GeodeticProfile();
     this.usingDefaultProfile = true;
+
+    // whether the map is round (geocentric) or flat (projected)
+    this.geocentric = true;
+
+    // whether this is a 3D or a 2D map
+    this.threeD = true;
+
+    // ordered list of image layers in the map
     this.imageLayers = [];
 
     // these handle the automatic deletion of culled tiles.
     this.drawList = {};
     this.expireList = {};
-    
+
     // you can monitor this value to see how many tiles are being drawn each frame.
     this.drawListSize = 0;
+
+    this.maxLevel = 22;
 };
 
 osgearth.Map.prototype = {
@@ -392,6 +372,21 @@ osgearth.Map.prototype = {
         }
     },
 
+    // converts [long,lat,alt] to world model coordinates [x,y,z]
+    lla2world: function(lla) {
+        if (this.geocentric)
+            return this.profile.ellipsoid.lla2ecef(lla);
+        else
+            return this.profile.fromLLA(lla);
+    },
+
+    world2lla: function(world) {
+        if (this.geocentric)
+            return this.profile.ellipsoid.ecef2lla(world);
+        else
+            return this.profile.toLLA(world);
+    },
+
     createNode: function() {
         var node = new osg.Node();
         for (var x = 0; x < this.profile.baseTilesX; x++) {
@@ -399,6 +394,7 @@ osgearth.Map.prototype = {
                 node.addChild(new osgearth.Tile([x, y, 0], this, null));
             }
         }
+        node.getOrCreateStateSet().setAttributeAndMode(new osg.CullFace('DISABLE'));
         return node;
     },
 
@@ -417,7 +413,7 @@ osgearth.Map.prototype = {
                 tile.resetSubtiles();
             }
         }
-        
+
         // use this frame's draw list as the next frame's expiration list.
         this.expireList = this.drawList;
         delete this.drawList;
@@ -447,9 +443,11 @@ osgearth.Tile = function(key, map) {
 
     var centerLLA = osgearth.Extent.center(extent);
 
-    this.centerECEF = map.profile.ellipsoid.lla2ecef([centerLLA[0], centerLLA[1], 0]);
+    this.centerWorld = map.lla2world([centerLLA[0], centerLLA[1], 0]);
+
+    //this.centerWorld = map.profile.ellipsoid.lla2ecef([centerLLA[0], centerLLA[1], 0]);
     this.centerNormal = [];
-    osg.Vec3.normalize(this.centerECEF, this.centerNormal);
+    osg.Vec3.normalize(this.centerWorld, this.centerNormal);
     this.deviation = 0.0;
 
     this.geometry = null;
@@ -494,17 +492,20 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
         var texcoords0 = [];
         var corner = [];
 
-        var numRows = 8;
-        var numCols = 8;
+        var numRows = this.map.threeD ? 8 : 2;
+        var numCols = this.map.threeD ? 8 : 2;
 
         var extentLLA = osgearth.TileKey.getExtentLLA(this.key, this.map.profile);
         var lonSpacing = osgearth.Extent.width(extentLLA) / (numCols - 1);
         var latSpacing = osgearth.Extent.height(extentLLA) / (numRows - 1);
 
         // localizer matrix:
-        var tile2ecef = this.map.profile.ellipsoid.local2worldFromECEF(this.centerECEF);
-        var ecef2tile = [];
-        osg.Matrix.inverse(tile2ecef, ecef2tile);
+        var tile2world =
+            this.map.threeD ?
+            this.map.profile.ellipsoid.local2worldFromECEF(this.centerWorld) :
+            osg.Matrix.makeTranslate(this.centerWorld[0], this.centerWorld[1], this.centerWorld[2]);
+        var world2tile = [];
+        osg.Matrix.inverse(tile2world, world2tile);
 
         var e = 0, v = 0, c = 0, tc = 0, vi = 0;
 
@@ -515,11 +516,15 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
                 var s = col / (numCols - 1);
                 var lla = [extentLLA.xmin + lonSpacing * col, extentLLA.ymin + latSpacing * row, 0.0];
 
-                var ecef = this.map.profile.ellipsoid.lla2ecef(lla);
-                var vert = osg.Matrix.transformVec3(ecef2tile, ecef, []);
+                var world = this.map.lla2world(lla);
+                var vert = osg.Matrix.transformVec3(world2tile, world, []);
                 this.insertArray(vert, verts, v);
 
-                var normal = osg.Vec3.normalize(vert, []);
+                // todo: fix for elevation.
+                var normal =
+                    this.map.geocentric ? osg.Vec3.normalize(vert, []) :
+                    [0, 0, 1];
+
                 this.insertArray(normal, normals, v);
                 v += 3;
 
@@ -532,22 +537,22 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
                 }
                 vi++;
 
+                // simple [0..1] tex coords
                 var uv = [s, t];
                 if (this.map.profile.getUV !== undefined)
                     uv = this.map.profile.getUV(extentLLA, lla);
 
-                // simple [0..1] tex coords
                 this.insertArray([s, uv[1]], texcoords0, tc);
                 tc += 2;
 
                 if (row == 0 && col == 0)
-                    corner[0] = ecef;
+                    corner[0] = world;
                 else if (row == 0 && col == numCols - 1)
-                    corner[1] = ecef;
+                    corner[1] = world;
                 else if (row == numRows - 1 && col == 0)
-                    corner[2] = ecef;
+                    corner[2] = world;
                 else if (row == numRows - 1 && col == numCols - 1)
-                    corner[3] = ecef;
+                    corner[3] = world;
             }
         }
 
@@ -581,16 +586,16 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
         }
 
         this.xform = new osg.MatrixTransform();
-        this.xform.setMatrix(tile2ecef);
+        this.xform.setMatrix(tile2world);
         this.xform.addChild(this.geometry);
 
         this.subtileRange = this.getBound().radius() * 3;
 
-        // now determine the tile's deviation for normal-based culling
-        if (this.key[2] > 0) {
+        // now determine the tile's deviation for geocentric normal-based culling
+        if (this.map.geocentric && this.key[2] > 0) {
             for (var i = 0; i < 4; i++) {
                 var vec = [];
-                osg.Vec3.sub(corner[i], this.centerECEF, vec);
+                osg.Vec3.sub(corner[i], this.centerWorld, vec);
                 osg.Vec3.normalize(vec, vec);
                 var dot = osg.Vec3.dot(this.centerNormal, vec);
                 if (dot < this.deviation)
@@ -632,10 +637,10 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
             var eye = this.getEyePoint(visitor);
 
             var centerToEye = [];
-            osg.Vec3.sub(eye, this.centerECEF, centerToEye);
+            osg.Vec3.sub(eye, this.centerWorld, centerToEye);
             osg.Vec3.normalize(centerToEye, centerToEye);
 
-            if (this.key[2] == 0 || osg.Vec3.dot(centerToEye, this.centerNormal) >= this.deviation) {
+            if (this.key[2] == 0 || !this.map.geocentric || osg.Vec3.dot(centerToEye, this.centerNormal) >= this.deviation) {
 
                 // tell the map we're drawing this tile (so it doesn't get exipred)
                 this.map.markTileDrawn(this);
@@ -646,7 +651,7 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
                 var traverseChildren = true;
                 var numChildren = this.children.length;
 
-                if (range > this.subtileRange) {
+                if (range > this.subtileRange || this.key[2] >= this.map.maxLevel) {
                     traverseChildren = false;
                 }
                 else {

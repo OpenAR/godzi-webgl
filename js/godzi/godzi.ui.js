@@ -93,21 +93,16 @@ osg.Quat.rotateVecOnToVec = function(from, to, r) {
 
 //........................................................................
 
-godzi.EarthManipulator = function(map) {
+godzi.Manipulator = function(map) {
     this.map = map;
     this.center = [0, 0, 0];
     this.minDistance = 0.001;
     this.maxDistance = 1e10;
-    this.minPitch = osgearth.deg2rad(-89.9);
-    this.maxPitch = osgearth.deg2rad(-10.0);
     this.buttonup = true;
     this.rotation = osg.Quat.makeIdentity();
-    this.centerRotation = osg.Quat.makeIdentity();
-    this.lockAzimWhilePanning = true;
-    this.computeHomePosition();
-}
+};
 
-godzi.EarthManipulator.prototype = {
+godzi.Manipulator.prototype = {
 
     init: function() {
     },
@@ -119,6 +114,53 @@ godzi.EarthManipulator.prototype = {
     setNode: function(node) {
         this.node = node;
     },
+
+    mouseup: function(ev) {
+        this.dragging = false;
+        this.panning = false;
+        this.releaseButton(ev);
+    },
+
+    mousedown: function(ev) {
+        this.panning = true;
+        this.dragging = true;
+        var pos = this.convertEventToCanvas(ev);
+        this.clientX = pos[0];
+        this.clientY = pos[1];
+        this.pushButton(ev);
+    },
+
+    pushButton: function() {
+        this.dx = this.dy = 0;
+        this.buttonup = false;
+    },
+
+    releaseButton: function() {
+        this.buttonup = true;
+    },
+
+    setDistance: function(d) {
+        this.distance = d;
+        if (this.distance < this.minDistance)
+            this.distance = this.minDistance;
+        else if (this.distance > this.maxDistance)
+            this.distance = this.maxDistance;
+    },
+};
+
+//........................................................................
+
+godzi.EarthManipulator = function(map) {
+    godzi.Manipulator.call(this, map);
+    this.minPitch = osgearth.deg2rad(-89.9);
+    this.maxPitch = osgearth.deg2rad(-10.0);
+    this.buttonup = true;
+    this.centerRotation = osg.Quat.makeIdentity();
+    this.lockAzimWhilePanning = true;
+    this.computeHomePosition();
+}
+
+godzi.EarthManipulator.prototype = osg.objectInehrit( godzi.Manipulator.prototype, {
 
     computeHomePosition: function() {
         this.setViewpoint(0, -90, 0, 0, -90, 1e7);
@@ -138,21 +180,6 @@ godzi.EarthManipulator.prototype = {
             this.mode = 1 - this.mode;
             return false;
         }
-    },
-
-    mouseup: function(ev) {
-        this.dragging = false;
-        this.panning = false;
-        this.releaseButton(ev);
-    },
-
-    mousedown: function(ev) {
-        this.panning = true;
-        this.dragging = true;
-        var pos = this.convertEventToCanvas(ev);
-        this.clientX = pos[0];
-        this.clientY = pos[1];
-        this.pushButton(ev);
     },
 
     mousemove: function(ev) {
@@ -182,6 +209,10 @@ godzi.EarthManipulator.prototype = {
         return false;
     },
 
+    mousewheel: function(ev, intDelta, deltaX, deltaY) {
+        this.zoomModel(0, intDelta * 0.1);
+    },
+
     dblclick: function(ev) {
     },
 
@@ -192,10 +223,6 @@ godzi.EarthManipulator.prototype = {
     },
 
     touchMove: function(ev) {
-    },
-    
-    mousewheel: function(ev, intDelta, deltaX, deltaY) {
-        this.zoomModel( 0, intDelta * 0.1 );
     },
 
     getCoordFrame: function(point) {
@@ -263,22 +290,10 @@ godzi.EarthManipulator.prototype = {
         this.localPitch -= Math.PI / 2.0;
     },
 
-    setDistance: function(d) {
-        this.distance = d;
-        if (this.distance < this.minDistance)
-            this.distance = this.minDistance;
-        else if (this.distance > this.maxDistance)
-            this.distance = this.maxDistance;
-    },
-
     recalculateCenter: function(localFrame) {
         var lla = this.map.profile.ellipsoid.ecef2lla(osg.Matrix.getTrans(localFrame));
         lla[2] = 0.0;
         this.center = this.map.profile.ellipsoid.lla2ecef(lla);
-    },
-
-    update: function(dx, dy) {
-        this.panModel(-dx, -dy);
     },
 
     panModel: function(dx, dy) {
@@ -354,15 +369,6 @@ godzi.EarthManipulator.prototype = {
         }
     },
 
-    pushButton: function() {
-        this.dx = this.dy = 0;
-        this.buttonup = false;
-    },
-
-    releaseButton: function() {
-        this.buttonup = true;
-    },
-
     getRotation: function(point) {
         var cf = this.getCoordFrame(point);
         var look = osg.Vec3.neg(this.getUpVector(cf), []);
@@ -414,10 +420,71 @@ godzi.EarthManipulator.prototype = {
         osg.Matrix.postMult(osg.Matrix.makeRotateFromQuat(osg.Quat.inverse(this.centerRotation)), m);
         osg.Matrix.postMult(osg.Matrix.makeRotateFromQuat(osg.Quat.inverse(this.rotation)), m);
         osg.Matrix.postMult(osg.Matrix.makeTranslate(0, 0, -this.distance), m);
-        //osg.Matrix.getLookAt(m, this.out_eye, this.out_center, this.out_up, this.distance);
         return m;
     }
+});
+
+//........................................................................
+
+godzi.MapManipulator = function(map) {
+    godzi.Manipulator.call(this, map);
+    this.computeHomePosition();
 };
+
+godzi.MapManipulator.prototype = osg.objectInehrit(godzi.Manipulator.prototype, {
+
+    computeHomePosition: function() {
+        this.center = [0,0,0];
+        this.distance = osgearth.Extent.width(this.map.profile.extent)/2;
+        this.maxDistance = this.distance * 1.5;        
+    },
+    
+    panModel: function(dx, dy) {
+        var scale = -0.3 * this.distance;
+        this.center = osg.Vec3.add(this.center, [dx*scale, dy*scale, 0], []);
+        this.center[0] = osgearth.clamp( this.center[0], this.map.profile.extent.xmin, this.map.profile.extent.xmax );
+        this.center[1] = osgearth.clamp( this.center[1], this.map.profile.extent.ymin, this.map.profile.extent.ymax );
+    },
+    
+    zoomModel: function(dx, dy) {
+        var fd = 1000;
+        var scale = 1 + dy;
+        if (fd * scale > this.minDistance)
+            this.setDistance(this.distance * scale);
+        else
+            this.setDistance(this.minDistance);
+    },
+
+    getInverseMatrix: function() {
+        var eye = [];
+        osg.Vec3.copy( this.center, eye );
+        eye[2] = this.distance;
+        var m = osg.Matrix.makeLookAt( eye, this.center, [0,1,0] );
+        return m;
+    },
+
+    mousemove: function(ev) {
+        if (this.buttonup === true) 
+            return;
+            
+        var pos = this.convertEventToCanvas(ev);
+        var curX = pos[0];
+        var curY = pos[1];
+
+        var scaleFactor = 100.0;
+        var deltaX = (this.clientX - curX) / scaleFactor;
+        var deltaY = (this.clientY - curY) / scaleFactor;
+        this.clientX = curX;
+        this.clientY = curY;
+
+        this.panModel(-deltaX, -deltaY);
+        return false;
+    },
+
+    mousewheel: function(ev, intDelta, deltaX, deltaY) {
+        this.zoomModel(0, intDelta * 0.1);
+    },
+} );
 
 //........................................................................
 
@@ -437,7 +504,10 @@ godzi.MapView = function(elementId, size, map) {
     //try {
     this.viewer = new osgViewer.Viewer(canvas);
     this.viewer.init();
-    this.viewer.setupManipulator(new godzi.EarthManipulator(map));
+    if ( map.geocentric )
+        this.viewer.setupManipulator(new godzi.EarthManipulator(map));
+    else
+        this.viewer.setupManipulator(new godzi.MapManipulator(map));
     this.viewer.setScene(map.createNode());
     delete this.viewer.view.light;
     this.viewer.getManipulator().computeHomePosition();

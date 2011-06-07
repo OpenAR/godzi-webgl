@@ -18,7 +18,7 @@ godzi.PlaceSearch = function(parentId, inputId, callback)
   if (inputId == undefined)
     inputId = "inputPlaceSearch";
   
-  document.getElementById(parentId).innerHTML = '<input id="' + inputId + '" size="20em" type="text" onkeydown="if(event.keyCode==13) godzi.PlaceSearch.doSearch(value, ' + callback + ');" />';
+  document.getElementById(parentId).innerHTML = 'Search: <input id="' + inputId + '" size="20em" type="text" onkeydown="if(event.keyCode==13) godzi.PlaceSearch.doSearch(value, ' + callback + ');" />';
 };
 
 godzi.PlaceSearch.doSearch = function(place, callback)
