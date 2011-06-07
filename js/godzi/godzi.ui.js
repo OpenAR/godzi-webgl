@@ -442,8 +442,7 @@ godzi.MapManipulator.prototype = osg.objectInehrit(godzi.Manipulator.prototype, 
     panModel: function(dx, dy) {
         var scale = -0.3 * this.distance;
         this.center = osg.Vec3.add(this.center, [dx*scale, dy*scale, 0], []);
-        this.center[0] = osgearth.clamp( this.center[0], this.map.profile.extent.xmin, this.map.profile.extent.xmax );
-        this.center[1] = osgearth.clamp( this.center[1], this.map.profile.extent.ymin, this.map.profile.extent.ymax );
+        osgearth.Extent.clamp( this.map.profile.extent, this.center );
     },
     
     zoomModel: function(dx, dy) {
@@ -502,7 +501,12 @@ godzi.MapView = function(elementId, size, map) {
     canvas.height = size.h;
 
     //try {
-    this.viewer = new osgViewer.Viewer(canvas);
+    this.viewer = new osgViewer.Viewer(canvas);   
+     
+    //If you don't do this then the mouse manipulators listen for mouse events on the whole dom
+    //so dragging other controls end up moving the canvas view.
+    this.viewer.eventNode = this.viewer.canvas;
+ 
     this.viewer.init();
     if ( map.geocentric )
         this.viewer.setupManipulator(new godzi.EarthManipulator(map));

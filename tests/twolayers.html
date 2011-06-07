@@ -43,6 +43,19 @@
         padding: 2;
     }
     
+    #LayerSwitcher
+    {
+         clear: both;
+         width: 300px;
+         padding: 5;
+         margin: 5;
+    }
+    
+	.opacity-slider {
+      margin: 0.2em 1em 0.2em 1em;
+	}
+
+    
     a { color: #ffffff; }
     
 </style>
@@ -52,14 +65,25 @@
 <meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
 
 <script type="text/javascript" src="../js/jquery/jquery-1.4.2.js"></script>
+<script type="text/javascript" src="../js/jquery/jquery-ui-1.8.2.custom.min.js"></script>
 <script type="text/javascript" src="../js/godzi.js"></script>
 
+<link href="../css/ui-lightness/jquery.ui.all.css" rel="stylesheet" type="text/css"></link>
+
 <script type="text/javascript">
+
+var map;
+var layerSwitcher;
+
+function toggleVisiblity() {
+  //map.imageLayers[1].setVisible(!map.imageLayers[1].getVisible());
+  map.imageLayers[1].setOpacity(0.2);
+}
 
     godzi.init("../js/", function() {
 
         // create a map model:
-        var map = new godzi.Map();
+        map = new godzi.Map();
 
         map.addImageLayer(new godzi.TMSImageLayer({
             name: "Landsat",
@@ -93,7 +117,11 @@
                 "Azim: " + osgearth.rad2deg(mapView.viewer.manipulator.localAzim).toFixed(1) + "\u00B0" +
                 "  Pitch:" + osgearth.rad2deg(mapView.viewer.manipulator.localPitch).toFixed(1) + "\u00B0");
         }
+        
+        layerSwitcher = new godzi.controls.LayerSwitcher("LayerSwitcher", map);               
+        jQuery("#LayerSwitcher").draggable();
     });
+    
 
 </script>
 </head>
@@ -118,7 +146,13 @@
       <li>shift-drag to rotate</li>
       <li>space to reset</li>
     </ul>
+    
+    <div id="LayerSwitcher" class="ui-widget-content">
+    </div>
+    
+    <!--<button onclick="toggleVisiblity();">Toggle Visiblity</button>-->
   </div>
+ 
   <div id="Coords">
   </div>
 </body>

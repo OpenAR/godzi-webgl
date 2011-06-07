@@ -98,7 +98,8 @@ godzi.init = function(scriptDir, onload) {
         "osgearth/osgearth.js",
         "godzi/godzi.ui.js",
         "godzi/godzi.data.js",
-		"godzi/godzi.experimental.js"
+		"godzi/godzi.experimental.js",
+		"godzi/godzi.controls.js"
     ];
 
     var libsWithDir = [];

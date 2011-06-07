@@ -52,6 +52,10 @@ osgearth.Extent = {
     },
     center: function(extent) {
         return [(extent.xmin + extent.xmax) / 2, (extent.ymin + extent.ymax) / 2];
+    },
+    clamp: function(extent, vec2) {
+        vec2[0] = osgearth.clamp( vec2[0], extent.xmin, extent.xmax );
+        vec2[1] = osgearth.clamp( vec2[1], extent.ymin, extent.ymax );
     }
 };
 
@@ -194,6 +198,7 @@ osgearth.MercatorProfile = function() {
     };
 };
 
+// this is spherical mercator, but that's ok for now
 osgearth.MercatorProfile.prototype = osg.objectInehrit(osgearth.Profile.prototype, {
 
     getUV: function(localExtentLLA, lla) {
@@ -205,7 +210,6 @@ osgearth.MercatorProfile.prototype = osg.objectInehrit(osgearth.Profile.prototyp
         return [u, v];
     },
 
-    // technically, this is spherical mercator, but that's ok for now
     lat2v: function(lat) {
         var sinLat = Math.sin(lat);
         return 0.5 - Math.log((1 + sinLat) / (1 - sinLat)) / (4 * Math.PI);
@@ -215,7 +219,6 @@ osgearth.MercatorProfile.prototype = osg.objectInehrit(osgearth.Profile.prototyp
         return [
             lla[0] * this.ellipsoid.radiusEquator,
             this.ellipsoid.absMaxMerc_m - this.lat2v(lla[1]) * 2 * this.ellipsoid.absMaxMerc_m,
-//            -this.ellipsoid.absMaxMerc_m + this.lat2v(lla[1]) * 2 * this.ellipsoid.absMaxMerc_m,
             lla[2]];
     },
 
@@ -299,18 +302,90 @@ osgearth.TileKey = {
 osgearth.Texture = function() {
 
     osg.Texture.call(this);
-
-    var fragGen = function(unit) {
-        str = "texColor" + unit + " = texture2D( Texture" + unit + ", FragTexCoord" + unit + ".xy );\n";
-        str += "fragColor = vec4(mix(fragColor.rgb,texColor" + unit + ".rgb,texColor" + unit + ".a),1);\n";
+    
+    var fragInit = function(unit) {
+        var str = "varying vec2 FragTexCoord" + unit + ";\n";
+        str += "uniform sampler2D Texture" + unit + ";\n";
+        str += "vec4 texColor" + unit + ";\n";
+        str += "uniform bool Texture" + unit + "Visible;\n";
         return str;
     };
+    this.setShaderGeneratorFunction(fragInit, osg.ShaderGeneratorType.FragmentInit);
 
-    this.setShaderGeneratorFunction(fragGen, osg.ShaderGeneratorType.FragmentMain);
+    var fragMain = function(unit) {
+//        var str = "texColor" + unit + " = texture2D( Texture" + unit + ", FragTexCoord" + unit + ".xy );\n";
+//        str += "fragColor = vec4(mix(fragColor.rgb,texColor" + unit + ".rgb,texColor" + unit + ".a),1);\n";
+//        return str;
+        
+        var str = "if (Texture" + unit + "Visible) { \n";
+        str += "  texColor" + unit + " = texture2D( Texture" + unit + ", FragTexCoord" + unit + ".xy );\n";
+        str += "}\n";
+        str += "else {\n";
+        str += "  texColor" + unit + " = vec4(1,0,0,1);\n";
+        str += "};\n";                
+        str += "  fragColor = vec4(mix(fragColor.rgb,texColor" + unit + ".rgb,texColor" + unit + ".a),1);\n";            
+        return str;        
+    };
+    this.setShaderGeneratorFunction(fragMain, osg.ShaderGeneratorType.FragmentMain);
 };
 
 osgearth.Texture.prototype = osg.objectInehrit(osg.Texture.prototype, {
     cloneType: function() { var t = new osgearth.Texture(); t.default_type = true; return t; }
+    
+    /*
+=======
+    cloneType: function() { var t = new osgearth.Texture(); t.default_type = true; return t; },
+    
+    writeToShader: function(unit, type) {
+        var str = "";
+        switch (type) {
+            case osg.ShaderGeneratorType.VertexInit:
+                str = "attribute vec2 TexCoord" + unit + ";\n";
+                str += "varying vec2 FragTexCoord" + unit + ";\n";
+                break;
+            case osg.ShaderGeneratorType.VertexMain:
+                str = "FragTexCoord" + unit + " = TexCoord" + unit + ";\n";
+                break;
+            case osg.ShaderGeneratorType.FragmentInit:
+                str = "varying vec2 FragTexCoord" + unit + ";\n";
+                str += "uniform sampler2D Texture" + unit + ";\n";
+                str += "vec4 texColor" + unit + ";\n";
+                str += "uniform bool Texture" + unit + "Visible;\n";
+                break;
+            case osg.ShaderGeneratorType.FragmentMain:
+                str = "if (Texture" + unit + "Visible){\n";                
+//                str =  " if (true) {\n";
+                str += "  texColor" + unit + " = texture2D( Texture" + unit + ", FragTexCoord" + unit + ".xy );\n";
+                str += "}\n";
+                str += "else {\n";
+                str += "  texColor" + unit + " = vec4(1,0,0,1);\n";
+                str += "};\n";                
+                str += "  fragColor = vec4(mix(fragColor.rgb,texColor" + unit + ".rgb,texColor" + unit + ".a),1);\n";            
+                // hack to prevent the default ShaderGenerator code from overriding our mix:
+                str += "texColor" + unit + " = vec4(1,1,1,1);\n";
+                break;
+        }
+        return str;
+    },
+    */
+    
+   /*
+   getOrCreateUniforms: function(unit) {
+        if (osg.Texture.uniforms === undefined) {
+            osg.Texture.uniforms = [];
+        }
+        if (osg.Texture.uniforms[unit] === undefined) {
+            var name = this.getType() + unit;
+            var uniforms = {};
+            uniforms[name] = osg.Uniform.createInt1(unit, name);
+            uniforms[name + "Visible"] = osg.Uniform.createInt1(true, name + "Visible");
+            var uniformKeys = [name, name + "Visible"];
+            uniforms.uniformKeys = uniformKeys;
+
+            osg.Texture.uniforms[unit] = uniforms;                        
+        }
+        return osg.Texture.uniforms[unit];
+    },*/
 });
 
 osgearth.Texture.create = function(imageSource) {
@@ -328,13 +403,41 @@ osgearth.Texture.create = function(imageSource) {
 osgearth.ImageLayer = function(name) {
     this.name = name;
     this.profile = undefined;
+    this.opacity = 1.0;
+    this.visible = true;
 };
 
 osgearth.ImageLayer.prototype = {
 
     name: function() {
         return this.name;
-    }
+    },
+    
+    getOpacity: function() {
+        return this.opacity;
+    },
+    
+    setOpacity: function(opacity) {
+        if (this.opacity != opacity) {
+          this.opacity = opacity;
+          if (this.opacityUniform !== undefined ) {
+           this.opacityUniform.set( [this.opacity] );
+         }
+        }
+    },
+    
+    getVisible: function() {
+      return this.visible;
+    },
+    
+    setVisible: function( visible ) {
+      if (this.visible != visible) {
+         this.visible = visible;
+         if (this.visibleUniform !== undefined ) {
+           this.visibleUniform.set( [this.visible] );
+         }
+      }
+    }        
 };
 
 //...................................................................
@@ -359,6 +462,7 @@ osgearth.Map = function() {
     // you can monitor this value to see how many tiles are being drawn each frame.
     this.drawListSize = 0;
 
+    // don't subdivide beyond this level
     this.maxLevel = 22;
 };
 
@@ -368,8 +472,8 @@ osgearth.Map.prototype = {
         this.imageLayers.push(layer);
         if (this.usingDefaultProfile && layer.profile !== undefined) {
             this.profile = layer.profile;
-            this.usingDefaultProfile = false;
-        }
+            this.usingDefaultProfile = false;            
+        }       
     },
 
     // converts [long,lat,alt] to world model coordinates [x,y,z]
@@ -394,7 +498,32 @@ osgearth.Map.prototype = {
                 node.addChild(new osgearth.Tile([x, y, 0], this, null));
             }
         }
+
         node.getOrCreateStateSet().setAttributeAndMode(new osg.CullFace('DISABLE'));
+
+        this.node = node;
+        
+        for (var i = 0; i < this.imageLayers.length; i++) {                
+          var visible = this.imageLayers[i].getVisible() ? true : false;
+          var visibleUniform =  osg.Uniform.createInt1(visible,"Texture" + i + "Visible");
+          this.node.getOrCreateStateSet().addUniform(visibleUniform, osg.StateAttribute.ON | osg.StateAttribute.OVERRIDE);
+          this.imageLayers[i].visibleUniform = visibleUniform;          
+
+          var opacity = this.imageLayers[i].getOpacity();
+          var opacityUniform =  osg.Uniform.createFloat1(opacity,"Texture" + i + "Opacity");          
+          this.node.getOrCreateStateSet().addUniform(opacityUniform, osg.StateAttribute.ON | osg.StateAttribute.OVERRIDE);
+          this.imageLayers[i].opacityUniform = opacityUniform;          
+          this.node.getOrCreateStateSet().addUniform(opacityUniform, osg.StateAttribute.ON | osg.StateAttribute.OVERRIDE);
+        }
+        
+        var program = osg.Program.create(
+            osg.Shader.create(gl.VERTEX_SHADER, this.getVertexShader()),
+            osg.Shader.create(gl.FRAGMENT_SHADER, this.getFragmentShader())
+        );      
+        node.getOrCreateStateSet().setAttributeAndMode( program, osg.StateAttribute.ON | osg.StateAttribute.OVERRIDE );
+        node.getOrCreateStateSet().addUniform(osg.Uniform.createInt1(0, "Texture0"));
+        node.getOrCreateStateSet().addUniform(osg.Uniform.createInt1(1, "Texture1"));               
+        
         return node;
     },
 
@@ -419,6 +548,92 @@ osgearth.Map.prototype = {
         delete this.drawList;
         this.drawList = {};
         this.drawListSize = 0;
+    },
+    
+    getVertexShader: function() {
+      return [
+       "",
+       "#ifdef GL_ES",
+       "precision highp float;",
+       "#endif",
+       "attribute vec3 Vertex;",
+       "attribute vec4 Color;",
+       "attribute vec3 Normal;",
+       "uniform int ArrayColorEnabled;",
+       "uniform mat4 ModelViewMatrix;",
+       "uniform mat4 ProjectionMatrix;",
+       "uniform mat4 NormalMatrix;",
+       "varying vec4 VertexColor;",
+       "attribute vec2 TexCoord0;",
+       "varying vec2 FragTexCoord0;",
+       "attribute vec2 TexCoord1;",
+       "varying vec2 FragTexCoord1;",
+       "uniform vec4 MaterialAmbient;",
+       "uniform vec4 MaterialDiffuse;",
+       "uniform vec4 MaterialSpecular;",
+       "uniform vec4 MaterialEmission;",
+       "uniform float MaterialShininess;",
+       "vec4 Ambient;",
+       "vec4 Diffuse;",
+       "vec4 Specular;",
+       "vec4 ftransform() {",
+       "  return ProjectionMatrix * ModelViewMatrix * vec4(Vertex, 1.0);",
+       "}",
+       "void main(void) {",
+       "  gl_Position = ftransform();",
+       "  if (ArrayColorEnabled == 1) VertexColor = Color;",
+       "  else VertexColor = vec4(1.0,1.0,1.0,1.0);",
+       "  FragTexCoord0 = TexCoord0;",
+       "  FragTexCoord1 = TexCoord1;",
+       "}",
+       ""
+      ].join('\n'); 
+    },
+
+    getFragmentShader: function() {
+    return [
+      "",
+      "#ifdef GL_ES",
+      "precision highp float;",
+      "#endif",
+      "varying vec4 VertexColor;",
+      "uniform int ArrayColorEnabled;",
+      "vec4 fragColor;",
+      "varying vec2 FragTexCoord0;",
+      "uniform sampler2D Texture0;",
+      "uniform float Texture0Opacity;",
+      "vec4 texColor0;",
+      "uniform bool Texture0Visible;",
+      "uniform float Texture1Opacity;",
+      "varying vec2 FragTexCoord1;",
+      "uniform sampler2D Texture1;",
+      "vec4 texColor1;",
+      "uniform bool Texture1Visible;",
+      "void main(void) {",
+      "  fragColor = VertexColor;",
+      "  if (Texture0Visible){",
+      "    texColor0 = texture2D( Texture0, FragTexCoord0.xy );",
+      "  }",
+      " else {",
+      "     texColor0 = vec4(0,0,0,0);",
+      " };",
+      " fragColor = vec4(mix(fragColor.rgb,texColor0.rgb,texColor0.a * Texture0Opacity),1);",
+      " texColor0 = vec4(1,1,1,1);",
+      " if (Texture1Visible){",
+      "   texColor1 = texture2D( Texture1, FragTexCoord1.xy );",
+      " }",
+      " else {",
+      "   texColor1 = vec4(1,0,0,0);",
+      " };",
+      " fragColor = vec4(mix(fragColor.rgb,texColor1.rgb,texColor1.a * Texture1Opacity),1);",
+      " texColor1 = vec4(1,1,1,1);",
+      " fragColor = fragColor * texColor0;",
+      " fragColor = fragColor * texColor1;",
+      " gl_FragColor = fragColor;",
+      "}",
+      
+     ].join('\n');
+
     }
 
 };
@@ -445,7 +660,6 @@ osgearth.Tile = function(key, map) {
 
     this.centerWorld = map.lla2world([centerLLA[0], centerLLA[1], 0]);
 
-    //this.centerWorld = map.profile.ellipsoid.lla2ecef([centerLLA[0], centerLLA[1], 0]);
     this.centerNormal = [];
     osg.Vec3.normalize(this.centerWorld, this.centerNormal);
     this.deviation = 0.0;
