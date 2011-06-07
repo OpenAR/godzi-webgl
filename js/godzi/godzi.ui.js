@@ -525,6 +525,10 @@ godzi.MapView = function(elementId, size, map) {
 
 godzi.MapView.prototype = {
 
+    home: function() {
+      this.viewer.getManipulator().computeHomePosition();
+    },
+
     run: function() {
         var that = this;
         var render = function() {
