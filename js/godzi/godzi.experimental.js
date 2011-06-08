@@ -86,44 +86,58 @@ godzi.PositionedElement = function(id, lon, lat, alt) {
   this.lon = lon;
   this.alt = alt;
   this.offset = [0,0];
+  this.ecf = null;
+  this._dirty = true;
 }
 
 godzi.PositionedElement.prototype = {  
+
+  setLocation: function(lon, lat, alt) {
+    if (this.lon != lon || this.lat != lat || this.alt != alt) {
+      this.lon = lon;
+      this.lat = lat;
+      this.alt = alt;
+      _dirty = true;
+    }      
+  },
+  
   update : function(mapView) {
-      var ecf = mapView.map.lla2world([this.lon, this.lat, this.alt]);
+      if (this.ecf == null || this._dirty) {      
+        var ecf = mapView.map.lla2world([this.lon, this.lat, this.alt]);
+        this._dirty = false;
+        this.ecf = ecf;
+      }
       
       //Cull elements on the other side of the earth.
       var viewMatrix = mapView.viewer.view.getViewMatrix();
+      
+      if (this._lastViewMatrix !== undefined) {
+        if (osg.Matrix.equals(viewMatrix, this._lastViewMatrix)) {
+          return;
+        }
+      }
+      
+      //Save the last view matrix
+      this._lastViewMatrix = [];
+      osg.Matrix.copy(viewMatrix, this._lastViewMatrix);
+            
       viewMatrix = osg.Matrix.inverse(viewMatrix);
       var eye = [];      
       osg.Matrix.getTrans(viewMatrix, eye);
-      //osg.Vec3.normalize(eye, eye);
-      
-      /*var m = mapView.viewer.view.getViewMatrix();
-      var eye = [];
-      var center = [];
-      var up = [];
-      osg.Matrix.getLookAt(m, eye, center, up );
-      */
-      
+                
       var lookVector = [];
-      osg.Vec3.sub( ecf, eye, lookVector );         
+      osg.Vec3.sub( this.ecf, eye, lookVector );         
       
       var worldUp = [];
-      osg.Vec3.copy(ecf, worldUp);
+      osg.Vec3.copy(this.ecf, worldUp);
       osg.Vec3.normalize( worldUp, worldUp );
       var dot = osg.Vec3.dot(lookVector, worldUp);
       if (dot > 0) {
         this.element.offset({top:0, left:-10000});
         return;
-      }
-      
-      
-      
-     
-      var window = mapView.projectObjectIntoWindow(ecf);
-      
-
+      }                  
+           
+      var window = mapView.projectObjectIntoWindow(this.ecf);      
       
       var x = (window[0] + this.offset[0]).toFixed();
       var y = (window[1] + this.offset[1]).toFixed();
@@ -145,7 +159,7 @@ godzi.PositionedElement.prototype = {
         offset: x + " " + y
       });      
       
-      this.lastWindow = [x,y];            
+      this.lastWindow = [x,y];                       
   }
 }
 
