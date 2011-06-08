@@ -214,6 +214,8 @@ godzi.EarthManipulator.prototype = osg.objectInehrit( godzi.Manipulator.prototyp
 
         if (ev.shiftKey)
             this.rotateModel(-deltaX, -deltaY);
+        else if (ev.ctrlKey)
+            this.zoomModel(0, -deltaY);
         else
             this.panModel(-deltaX, -deltaY);
 
