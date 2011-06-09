@@ -81,7 +81,12 @@ godzi.PlaceSearch.doSearch = function(place, callback)
 
 godzi.PositionedElement = function(id, lon, lat, alt) {
   this.id = id;
+  this.ownsElement = true;
   this.element = jQuery("#" + id);
+  //If we found an existing element we don't own it
+  if (this.element) {
+    this.ownsElement = false;    
+  }
   this.lat = lat;
   this.lon = lon;
   this.alt = alt;
@@ -91,6 +96,12 @@ godzi.PositionedElement = function(id, lon, lat, alt) {
 }
 
 godzi.PositionedElement.prototype = {  
+
+  destroy : function() {
+    if (this.ownsElement) {
+      this.element.remove();
+    }        
+  },
 
   setLocation: function(lon, lat, alt) {
     if (this.lon != lon || this.lat != lat || this.alt != alt) {
@@ -167,6 +178,7 @@ godzi.PositionedElement.prototype = {
 godzi.Icon = function(id, lon, lat, alt, url, options) {  
   godzi.PositionedElement.call(this, id, lon, lat, alt);    
   this.url = url;
+  this.ownsElement = true;
     
   var defaults = {
     width: 64,
@@ -220,6 +232,7 @@ godzi.Icon.prototype = osg.objectInehrit(godzi.PositionedElement.prototype, {
 godzi.Label = function(id, lon, lat, alt, text, options) {  
   godzi.PositionedElement.call(this, id, lon, lat, alt);    
   this.text = text;
+  this.ownsElement = true;
     
   var defaults = {
     class: ""
@@ -248,6 +261,25 @@ godzi.PositionEngine = function(mapView) {
 }
 
 godzi.PositionEngine.prototype = {
+  addElement: function(element) {
+    this.elements.push( element );
+  },
+  
+  removeElement: function(element) {  
+    var index = this.elements.indexOf( element );
+    if (index >= 0) {
+      element.destroy();
+      this.elements.splice( index, 1 );
+    }       
+  },
+  
+  clear: function() {
+    for (var i = 0; i < this.elements.length; i++) {
+      this.elements[i].destroy();
+    }
+    this.elements = [];
+  },
+  
   frameEnd: function() {
     for (var i = 0; i < this.elements.length; i++) {
       this.elements[i].update(this.mapView);

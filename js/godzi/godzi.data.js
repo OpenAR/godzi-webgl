@@ -177,7 +177,8 @@ godzi.GeoRSSLayer.prototype = {
 	},
 	
 	createIcons: function(items) {
-	    this.positionEngine.elements = [];
+        //this.positionEngine.elements = [];
+	    this.positionEngine.clear();
 		
 		for (var i in items)
 		{
@@ -190,7 +191,7 @@ godzi.GeoRSSLayer.prototype = {
 			
 			icon.offset = [this.options.width / -2, this.options.width * -1];
 			
-            this.positionEngine.elements.push( icon );   
+            this.positionEngine.addElement( icon );
 		}
 	}
 };
