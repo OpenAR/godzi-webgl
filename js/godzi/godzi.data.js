@@ -178,6 +178,7 @@ function showDialog(content, title) {
       bgiframe : true,
       resizable: false,
       modal: false,
+      draggable: false,
       title: title,
       overlay: {
         backgroundColor: '#000',
