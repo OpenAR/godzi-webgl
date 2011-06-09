@@ -84,8 +84,8 @@
         mapView.addFrameEndCallback( function() {
             var xy = mapView.viewer.manipulator.center;
             var lla = map.world2lla(xy);
-            lla[0] = osgearth.rad2deg(lla[0]);
-            lla[1] = osgearth.rad2deg(lla[1]);
+            lla[0] = Math.rad2deg(lla[0]);
+            lla[1] = Math.rad2deg(lla[1]);
             jQuery("#Coords").html(
                 "Lat: " + lla[1].toFixed(2) + "\u00B0" + "  Long = " + lla[0].toFixed(2) + "\u00B0" + "<br/>" +
                 "X: " + xy[0].toFixed(1) + "  Y: " + xy[1].toFixed(1) + "<br/>");

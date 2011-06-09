@@ -18,13 +18,396 @@ osgearth.log = function(str) {
     }
 };
 
-osgearth.deg2rad = function(deg) {
+//........................................................................
+
+// OSG extensions ... 
+// eventually submit all this stuff to osgjs:
+
+osg.Quat.zeroRotation = function(q) {
+    return q[0] == 0 && q[1] == 0 & q[2] == 0 && q[3] == 1;
+};
+
+// osgjs's Quat.mult backwards?
+osg.Quat.multiply = function(a, b, r) {
+    if (r === undefined)
+        r = [];
+    return osg.Quat.mult(b, a, r);
+}
+
+osg.Quat.rotateVecOnToVec = function(from, to, r) {
+    if (r === undefined)
+        r = [];
+
+    var sourceVector = osg.Vec3.copy(from, []);
+    var targetVector = osg.Vec3.copy(to, []);
+
+    var fromLen2 = osg.Vec3.length2(from);
+    var fromLen = 0;
+    if (fromLen2 < 1 - 1e-7 || fromLen2 > 1 + 1e-7) {
+        fromLen = Math.sqrt(fromLen2);
+        sourceVector = osg.Vec3.mult(sourceVector, 1.0 / fromLen, []);
+    }
+
+    var toLen2 = osg.Vec3.length2(to);
+    if (toLen2 < 1 - 1e-7 || toLen2 > 1 + 1e-7) {
+        var toLen = 0;
+        if (toLen2 > fromLen2 - 1e-7 && toLen2 < fromLen2 + 1e-7) {
+            toLen = fromLen;
+        }
+        else {
+            toLen = Math.sqrt(toLen2);
+        }
+        targetVector = osg.Vec3.mult(targetVector, 1.0 / toLen, []);
+    }
+
+    var dotProdPlus1 = 1.0 + osg.Vec3.dot(sourceVector, targetVector);
+
+    if (dotProdPlus1 < 1e-7) {
+        if (Math.abs(sourceVector[0]) < 0.6) {
+            var norm = Math.sqrt(1.0 - sourceVector[0] * sourceVector[0]);
+            r[0] = 0.0;
+            r[1] = sourceVector[2] / norm;
+            r[2] = -sourceVector[1] / norm;
+            r[3] = 0.0;
+        }
+        else if (Math.abs(sourceVector[1]) < 0.6) {
+            var norm = Math.sqrt(1.0 - sourceVector[1] * sourceVector[1]);
+            r[0] = -sourceVector[2] / norm;
+            r[1] = 0.0;
+            r[2] = sourceVector[0] / norm;
+            r[3] = 0.0;
+        }
+        else {
+            var norm = Math.sqrt(1.0 - sourceVector[2] * sourceVector[2]);
+            r[0] = sourceVector[1] / norm;
+            r[1] = -sourceVector[0] / norm;
+            r[2] = 0.0;
+            r[3] = 0.0;
+        }
+    }
+
+    else {
+        // Find the shortest angle quaternion that transforms normalized vectors
+        // into one other. Formula is still valid when vectors are colinear
+        var s = Math.sqrt(0.5 * dotProdPlus1);
+        var tmp = osg.Vec3.cross(sourceVector, osg.Vec3.mult(targetVector, 1.0 / (2.0 * s)), []);
+        r[0] = tmp[0];
+        r[1] = tmp[1];
+        r[2] = tmp[2];
+        r[3] = s;
+    }
+
+    return r;
+};
+
+//........................................................................
+
+osgearth.FunctionLocation = {
+    VertexPreTexture: 0,
+    VertexPreLighting: 1,
+    VertexPostLighting: 2,
+    FragmentPreTexture: 3,
+    FragmentPreLighting: 4,
+    FragmentPostLighting: 5
+};
+
+osgearth.ShaderFactory = {};
+
+osgearth.ShaderFactory.createVertexShaderMain = function(functions) {
+    return [
+        "#ifdef GL_ES",
+        "precision highp float;",
+        "#endif",
+        // todo: insert functions here
+        "attribute vec3 Vertex;",
+        "attribute vec4 Color;",
+        "attribute vec3 Normal;",
+        "uniform int ArrayColorEnabled;",
+        "uniform mat4 ModelViewMatrix;",
+        "uniform mat4 ProjectionMatrix;",
+        "uniform mat4 NormalMatrix;",
+        "uniform int osgearth_LightingEnabled;",
+        "varying vec4 VertexColor;",
+        "void osgearth_vert_setupTexturing(void);",
+        //todo: insert all function prototypes
+        "",
+        "void main() {",
+        "    gl_Position = ProjectionMatrix * ModelViewMatrix * vec4(Vertex, 1.0);",
+        "    if (ArrayColorEnabled == 1)",
+        "        VertexColor = Color;",
+        "    else",
+        "        VertexColor = vec4(1.0,1.0,1.0,1.0);",
+        "",
+        //todo: call VertexPreTexture functions here
+        "    osgearth_vert_setupTexturing();",
+        //todo: call VertexPreLighting functions here
+        //"    if (osgearth_LightingEnabled == 1)";
+        //"        osgearth_vert_setupLighting();",
+        //todo: call VertexPostLighting functions here
+        "}"
+    ].join('\n');
+};
+
+osgearth.ShaderFactory.createFragmentShaderMain = function(functions) {
+    return [
+        "#ifdef GL_ES",
+        "precision highp float;",
+        "#endif",
+        "varying vec4 VertexColor;",
+        "uniform int osgearth_LightingEnabled;",
+        "void osgearth_frag_applyTexturing(inout vec4 color);",
+        //todo: insert all function prototypes
+        "",
+        "void main(void) {",
+        "    vec4 color = VertexColor;",
+        //todo call FragmentPreTexture functions
+        "    osgearth_frag_applyTexturing(color);",
+        //todo call FragmentPreLighting functions
+        //"    if (osgearth_LightingEnabled == 1)",
+        //"        osgearth_frag_applyLighting(color);",
+        //todo call FragmentPostLighting functions
+        "    gl_FragColor = color;",
+        "}"
+    ].join('\n');
+};
+
+osgearth.ShaderFactory.createVertexSetupTexturing = function(imageLayers) {
+    var buf = "";
+    
+    for( var unit=0; unit<imageLayers.length; unit++ ) {
+        buf += "attribute vec2 TexCoord" + unit + ";\n";
+        buf += "varying vec2 FragTexCoord" + unit + ";\n";
+    }
+    
+    buf += "void osgearth_vert_setupTexturing(void) { \n";
+    
+    for (var unit = 0; unit < imageLayers.length; unit++) {
+        buf += "    FragTexCoord" + unit + " = TexCoord" + unit + ";\n";
+    }
+    buf += "}\n";
+    
+    return buf;
+};
+
+osgearth.ShaderFactory.createFragmentApplyTexturing = function(imageLayers) {
+    var buf = "";
+
+    for (var unit = 0; unit < imageLayers.length; unit++) {
+        buf += "varying vec2 FragTexCoord" + unit + ";\n";
+        buf += "uniform sampler2D Texture" + unit + ";\n";
+        buf += "uniform bool Texture" + unit + "Visible;\n";
+        buf += "uniform float Texture" + unit + "Opacity;\n";
+    }
+
+    buf += "void osgearth_frag_applyTexturing(inout vec4 color) {\n";
+    buf += "    vec4 texel;\n";
+
+    for (var unit = 0; unit < imageLayers.length; unit++) {
+        buf += "    if (Texture" + unit + "Visible) { \n";
+        buf += "        texel = texture2D(Texture" + unit + ", FragTexCoord" + unit + ".xy );\n";
+        buf += "        color = vec4( mix( color.rgb, texel.rgb, texel.a * Texture" + unit + "Opacity), 1);\n";
+        buf += "    } \n";
+    }
+
+    buf += "}\n";
+
+    return buf;
+};
+
+//........................................................................
+
+osgearth.VirtualProgram = function() {
+    osg.Program.call(this);
+
+    this.virtualProgramMarker = true;
+
+    // shaders, keyed by a "sematic" string: name + gl shader type
+    this.shaderMap = {};
+
+    // key is FunctionLocation; value is array of sematics
+    this.funcSemanticsByLocation = {};
+
+    // object, each key is a FunctionLocation, each value is an array of shader sematics
+    this.accumulatedFuncSemanticsByLocation = {};
+
+    // cached programs, key = accumalted attribute semantic string
+    this.programCache = {};
+
+    this.vertex = {};
+    this.fragment = {};
+
+    this._dirty = true;
+
+    // install the base shaders
+    this.refreshMains();
+};
+
+osgearth.VirtualProgram.prototype = osg.objectInehrit(osg.Program.prototype, {
+
+    //VirtualProgramMarker: {},
+
+    isVirtualProgram: function(obj) {
+        return true;
+    },
+
+    cloneType: function() {
+        return new osgearth.VirtualProgram();
+    },
+
+    setShader: function(name, type, shaderSource) {
+        this.shaderMap[name + ";" + type] = shaderSource;
+        this._dirty = true;
+    },
+
+    // injects a GLSL function at the specified location
+    setFunction: function(name, source, location, priority) {
+        if (this.semanticsByLocation[location] === undefined)
+            this.semanticsByLocation[location] = [];
+        var type = (location <= 2) ? gl.VERTEX_SHADER : gl.FRAGMENT_SHADER;
+        var semantic = name + ';' + type;
+        this.setShader(semantic, source);
+        this.funcSemanticsByLocation[location].push(semantic); //todo: insert sorted by priority
+        this._dirty = true;
+    },
+
+    // rebuilds the main shader functions.
+    refreshMains: function() {
+        this.setShader(
+            "osgearth_vert_main",
+            gl.VERTEX_SHADER,
+            osgearth.ShaderFactory.createVertexShaderMain(this.accumulatedFunctions));
+
+        this.setShader(
+            "osgearth_frag_main",
+            gl.FRAGMENT_SHADER,
+            osgearth.ShaderFactory.createFragmentShaderMain(this.accumulatedFunctions));
+    },
+
+    apply: function(state) {
+        // pull the stack of "Program" attributes
+        var attributeStack = state.attributeMap[this.attributeType];
+        if (attributeStack === undefined)
+            return;
+
+        // constructs a string that uniquely identifies this accumulated shader program.
+        // it is a concatenation of all shader semantics in the current attribute stack.
+        var accumulatedSemantic = "";
+
+        for (var i = 0; i < attributeStack.length; ++i) {
+            var p = attributeStack[i];
+            if (this.isVirtualProgram(p)) {
+                for (var semantic in p.shaderMap) {
+                    accumulatedSemantic += semantic;
+                }
+            }
+        }
+
+        // add this VP's shaders to the identifier:
+        for (var semantic in this.shaderMap)
+            accumulatedSemantic += semantic;
+
+        // see if our gl program is already in the cache:
+        this.program = this.programCache[accumulatedSemantic];
+
+        // if not, build and compile it
+        if (this.program === undefined) {
+
+            // check for new user functions
+            this.refreshAccumulatedFunctions(state);
+
+            // rebuild the shaders
+            this.refreshMains();
+
+            // rebulid the shader list:
+            var vertShaderSource = "";
+            var fragShaderSource = "";
+
+            for (var semantic in this.shaderMap) {
+                var type = parseInt(semantic.split(';')[1]);
+                if (type === gl.VERTEX_SHADER)
+                    vertShaderSource += this.shaderMap[semantic] + '\n';
+                else // if ( semantic.type === gl.FRAGMENT_SHADER )
+                    fragShaderSource += this.shaderMap[semantic] + '\n';
+            }
+
+            this.vertex = osg.Shader.create(gl.VERTEX_SHADER, vertShaderSource);
+            this.vertex.compile();
+
+            this.fragment = osg.Shader.create(gl.FRAGMENT_SHADER, fragShaderSource);
+            this.fragment.compile();
+
+            this.program = gl.createProgram();
+
+            gl.attachShader(this.program, this.vertex.shader);
+            gl.attachShader(this.program, this.fragment.shader);
+            gl.linkProgram(this.program);
+            gl.validateProgram(this.program);
+
+            if (!gl.getProgramParameter(this.program, gl.LINK_STATUS)) {
+                osg.log("can't link program\n" + "vertex shader:\n" + this.vertex.text + "\n fragment shader:\n" + this.fragment.text);
+                osg.log(gl.getProgramInfoLog(this.program));
+                debugger;
+            }
+
+            this.uniformsCache = {};
+            this.uniformsCache.uniformKeys = [];
+            this.attributesCache = {};
+            this.attributesCache.attributeKeys = [];
+
+            this.cacheUniformList(this.vertex.text);
+            this.cacheUniformList(this.fragment.text);
+            //osg.log(this.uniformsCache);
+
+            this.cacheAttributeList(this.vertex.text);
+
+            // cache this gl program.
+            this.programCache[accumulatedSemantic] = this.program;
+
+            osg.log(vertShaderSource);
+            osg.log(fragShaderSource);
+        }
+
+        gl.useProgram(this.program);
+    },
+
+    refreshAccumulatedFunctions: function(state) {
+        // stack of all VirtualProgram attributes:
+        var attributeStack = state.attributeMap[this.attributeType];
+        if (attributeStack === undefined || attributeStack.length == 0)
+            return;
+
+        // accumulate all the user functions from all the VPs into a single list:
+        this.accumulatedFunctions = {};
+
+        for (var i = 0; i < attributeStack.length; ++i) {
+            var vp = attributeStack[i];
+            if (this.isVirtualProgram(vp)) {
+                for (var location in vp.funcSemanticsByLocation) {
+                    if (this.accumulatedFuncSemanticsByLocation[location] === undefined)
+                        this.accumulatedFuncSemanticsByLocation[location] = {};
+
+                    var semantics = vp.funcSemanticsByLocation[location];
+                    for (var j = 0; j < semantics.length; ++j) {
+                        var semantic = semantics[j].split(';')[0];
+                        this.accumulatedFuncSemanticsByLocation[location][semantic] = semantic;
+                    }
+                }
+            }
+        }
+    }
+});
+
+//........................................................................
+
+Math.deg2rad = function(deg) {
     return deg * 0.0174532925;
 }
-osgearth.rad2deg = function(rad) {
+
+Math.rad2deg = function(rad) {
     return rad * 57.2957795;
 }
-osgearth.clamp = function(x, min, max) {
+
+Math.clamp = function(x, min, max) {
     if (x < min)
         return min;
     else if (x > max)
@@ -54,8 +437,8 @@ osgearth.Extent = {
         return [(extent.xmin + extent.xmax) / 2, (extent.ymin + extent.ymax) / 2];
     },
     clamp: function(extent, vec2) {
-        vec2[0] = osgearth.clamp( vec2[0], extent.xmin, extent.xmax );
-        vec2[1] = osgearth.clamp( vec2[1], extent.ymin, extent.ymax );
+        vec2[0] = Math.clamp( vec2[0], extent.xmin, extent.xmax );
+        vec2[1] = Math.clamp(vec2[1], extent.ymin, extent.ymax);
     }
 };
 
@@ -203,9 +586,9 @@ osgearth.MercatorProfile.prototype = osg.objectInehrit(osgearth.Profile.prototyp
 
     getUV: function(localExtentLLA, lla) {
         var u = (lla[0] - localExtentLLA.xmin) / osgearth.Extent.width(localExtentLLA);
-        var vmin = this.lat2v(osgearth.clamp(localExtentLLA.ymax, this.extentLLA.ymin, this.extentLLA.ymax));
-        var vmax = this.lat2v(osgearth.clamp(localExtentLLA.ymin, this.extentLLA.ymin, this.extentLLA.ymax));
-        var vlat = this.lat2v(osgearth.clamp(lla[1], this.extentLLA.ymin, this.extentLLA.ymax));
+        var vmin = this.lat2v(Math.clamp(localExtentLLA.ymax, this.extentLLA.ymin, this.extentLLA.ymax));
+        var vmax = this.lat2v(Math.clamp(localExtentLLA.ymin, this.extentLLA.ymin, this.extentLLA.ymax));
+        var vlat = this.lat2v(Math.clamp(lla[1], this.extentLLA.ymin, this.extentLLA.ymax));
         var v = 1.0 - (vlat - vmin) / (vmax - vmin);
         return [u, v];
     },
@@ -296,110 +679,6 @@ osgearth.TileKey = {
 
 //...................................................................
 
-/**
- * Custom texture class that customizes the fragment shader
- */
-osgearth.Texture = function() {
-
-    osg.Texture.call(this);
-    
-    var fragInit = function(unit) {
-        var str = "varying vec2 FragTexCoord" + unit + ";\n";
-        str += "uniform sampler2D Texture" + unit + ";\n";
-        str += "vec4 texColor" + unit + ";\n";
-        str += "uniform bool Texture" + unit + "Visible;\n";
-        return str;
-    };
-    this.setShaderGeneratorFunction(fragInit, osg.ShaderGeneratorType.FragmentInit);
-
-    var fragMain = function(unit) {
-//        var str = "texColor" + unit + " = texture2D( Texture" + unit + ", FragTexCoord" + unit + ".xy );\n";
-//        str += "fragColor = vec4(mix(fragColor.rgb,texColor" + unit + ".rgb,texColor" + unit + ".a),1);\n";
-//        return str;
-        
-        var str = "if (Texture" + unit + "Visible) { \n";
-        str += "  texColor" + unit + " = texture2D( Texture" + unit + ", FragTexCoord" + unit + ".xy );\n";
-        str += "}\n";
-        str += "else {\n";
-        str += "  texColor" + unit + " = vec4(1,0,0,1);\n";
-        str += "};\n";                
-        str += "  fragColor = vec4(mix(fragColor.rgb,texColor" + unit + ".rgb,texColor" + unit + ".a),1);\n";            
-        return str;        
-    };
-    this.setShaderGeneratorFunction(fragMain, osg.ShaderGeneratorType.FragmentMain);
-};
-
-osgearth.Texture.prototype = osg.objectInehrit(osg.Texture.prototype, {
-    cloneType: function() { var t = new osgearth.Texture(); t.default_type = true; return t; }
-    
-    /*
-=======
-    cloneType: function() { var t = new osgearth.Texture(); t.default_type = true; return t; },
-    
-    writeToShader: function(unit, type) {
-        var str = "";
-        switch (type) {
-            case osg.ShaderGeneratorType.VertexInit:
-                str = "attribute vec2 TexCoord" + unit + ";\n";
-                str += "varying vec2 FragTexCoord" + unit + ";\n";
-                break;
-            case osg.ShaderGeneratorType.VertexMain:
-                str = "FragTexCoord" + unit + " = TexCoord" + unit + ";\n";
-                break;
-            case osg.ShaderGeneratorType.FragmentInit:
-                str = "varying vec2 FragTexCoord" + unit + ";\n";
-                str += "uniform sampler2D Texture" + unit + ";\n";
-                str += "vec4 texColor" + unit + ";\n";
-                str += "uniform bool Texture" + unit + "Visible;\n";
-                break;
-            case osg.ShaderGeneratorType.FragmentMain:
-                str = "if (Texture" + unit + "Visible){\n";                
-//                str =  " if (true) {\n";
-                str += "  texColor" + unit + " = texture2D( Texture" + unit + ", FragTexCoord" + unit + ".xy );\n";
-                str += "}\n";
-                str += "else {\n";
-                str += "  texColor" + unit + " = vec4(1,0,0,1);\n";
-                str += "};\n";                
-                str += "  fragColor = vec4(mix(fragColor.rgb,texColor" + unit + ".rgb,texColor" + unit + ".a),1);\n";            
-                // hack to prevent the default ShaderGenerator code from overriding our mix:
-                str += "texColor" + unit + " = vec4(1,1,1,1);\n";
-                break;
-        }
-        return str;
-    },
-    */
-    
-   /*
-   getOrCreateUniforms: function(unit) {
-        if (osg.Texture.uniforms === undefined) {
-            osg.Texture.uniforms = [];
-        }
-        if (osg.Texture.uniforms[unit] === undefined) {
-            var name = this.getType() + unit;
-            var uniforms = {};
-            uniforms[name] = osg.Uniform.createInt1(unit, name);
-            uniforms[name + "Visible"] = osg.Uniform.createInt1(true, name + "Visible");
-            var uniformKeys = [name, name + "Visible"];
-            uniforms.uniformKeys = uniformKeys;
-
-            osg.Texture.uniforms[unit] = uniforms;                        
-        }
-        return osg.Texture.uniforms[unit];
-    },*/
-});
-
-osgearth.Texture.create = function(imageSource) {
-    var a = new osgearth.Texture();
-    if (imageSource !== undefined) {
-        var img = new Image();
-        img.src = imageSource;
-        a.setImage(img);
-    }
-    return a;
-};
-
-//...................................................................
-
 osgearth.ImageLayer = function(name) {
     this.name = name;
     this.profile = undefined;
@@ -472,8 +751,8 @@ osgearth.Map.prototype = {
         this.imageLayers.push(layer);
         if (this.usingDefaultProfile && layer.profile !== undefined) {
             this.profile = layer.profile;
-            this.usingDefaultProfile = false;            
-        }       
+            this.usingDefaultProfile = false;
+        }
     },
 
     // converts [long,lat,alt] to world model coordinates [x,y,z]
@@ -498,31 +777,44 @@ osgearth.Map.prototype = {
                 node.addChild(new osgearth.Tile([x, y, 0], this, null));
             }
         }
+        
+        var stateSet = node.getOrCreateStateSet();
 
-        node.getOrCreateStateSet().setAttributeAndMode(new osg.CullFace('DISABLE'));
+        // set up our custom GLSL program
+        var vp = new osgearth.VirtualProgram();
+
+        vp.setShader(
+            "osgearth_vert_setupTexturing",
+            gl.VERTEX_SHADER,
+            osgearth.ShaderFactory.createVertexSetupTexturing(this.imageLayers));
+
+        vp.setShader(
+            "osgearth_frag_applyTexturing",
+            gl.FRAGMENT_SHADER,
+            osgearth.ShaderFactory.createFragmentApplyTexturing(this.imageLayers));
+
+
+        stateSet.setAttributeAndMode(vp, osg.StateAttribute.ON);
+
+        stateSet.setAttributeAndMode(new osg.CullFace('DISABLE'));
 
         this.node = node;
-        
-        for (var i = 0; i < this.imageLayers.length; i++) {                
-          var visible = this.imageLayers[i].getVisible() ? true : false;
-          var visibleUniform =  osg.Uniform.createInt1(visible,"Texture" + i + "Visible");
-          this.node.getOrCreateStateSet().addUniform(visibleUniform, osg.StateAttribute.ON | osg.StateAttribute.OVERRIDE);
-          this.imageLayers[i].visibleUniform = visibleUniform;          
 
-          var opacity = this.imageLayers[i].getOpacity();
-          var opacityUniform =  osg.Uniform.createFloat1(opacity,"Texture" + i + "Opacity");          
-          this.node.getOrCreateStateSet().addUniform(opacityUniform, osg.StateAttribute.ON | osg.StateAttribute.OVERRIDE);
-          this.imageLayers[i].opacityUniform = opacityUniform;          
-          this.node.getOrCreateStateSet().addUniform(opacityUniform, osg.StateAttribute.ON | osg.StateAttribute.OVERRIDE);
+        for (var i = 0; i < this.imageLayers.length; i++) {
+
+            var visible = this.imageLayers[i].getVisible() ? true : false;
+            var visibleUniform = osg.Uniform.createInt1(visible, "Texture" + i + "Visible");
+            stateSet.addUniform(visibleUniform, osg.StateAttribute.ON | osg.StateAttribute.OVERRIDE);
+            this.imageLayers[i].visibleUniform = visibleUniform;
+
+            var opacity = this.imageLayers[i].getOpacity();
+            var opacityUniform = osg.Uniform.createFloat1(opacity, "Texture" + i + "Opacity");
+            stateSet.addUniform(opacityUniform, osg.StateAttribute.ON | osg.StateAttribute.OVERRIDE);
+            this.imageLayers[i].opacityUniform = opacityUniform;
+            stateSet.addUniform(opacityUniform, osg.StateAttribute.ON | osg.StateAttribute.OVERRIDE);
+
+            stateSet.addUniform(osg.Uniform.createInt1(i, "Texture" + i));
         }
-        
-        var program = osg.Program.create(
-            osg.Shader.create(gl.VERTEX_SHADER, this.getVertexShader()),
-            osg.Shader.create(gl.FRAGMENT_SHADER, this.getFragmentShader())
-        );      
-        node.getOrCreateStateSet().setAttributeAndMode( program, osg.StateAttribute.ON | osg.StateAttribute.OVERRIDE );
-        node.getOrCreateStateSet().addUniform(osg.Uniform.createInt1(0, "Texture0"));
-        node.getOrCreateStateSet().addUniform(osg.Uniform.createInt1(1, "Texture1"));               
         
         return node;
     },
@@ -548,94 +840,7 @@ osgearth.Map.prototype = {
         delete this.drawList;
         this.drawList = {};
         this.drawListSize = 0;
-    },
-    
-    getVertexShader: function() {
-      return [
-       "",
-       "#ifdef GL_ES",
-       "precision highp float;",
-       "#endif",
-       "attribute vec3 Vertex;",
-       "attribute vec4 Color;",
-       "attribute vec3 Normal;",
-       "uniform int ArrayColorEnabled;",
-       "uniform mat4 ModelViewMatrix;",
-       "uniform mat4 ProjectionMatrix;",
-       "uniform mat4 NormalMatrix;",
-       "varying vec4 VertexColor;",
-       "attribute vec2 TexCoord0;",
-       "varying vec2 FragTexCoord0;",
-       "attribute vec2 TexCoord1;",
-       "varying vec2 FragTexCoord1;",
-       "uniform vec4 MaterialAmbient;",
-       "uniform vec4 MaterialDiffuse;",
-       "uniform vec4 MaterialSpecular;",
-       "uniform vec4 MaterialEmission;",
-       "uniform float MaterialShininess;",
-       "vec4 Ambient;",
-       "vec4 Diffuse;",
-       "vec4 Specular;",
-       "vec4 ftransform() {",
-       "  return ProjectionMatrix * ModelViewMatrix * vec4(Vertex, 1.0);",
-       "}",
-       "void main(void) {",
-       "  gl_Position = ftransform();",
-       "  if (ArrayColorEnabled == 1) VertexColor = Color;",
-       "  else VertexColor = vec4(1.0,1.0,1.0,1.0);",
-       "  FragTexCoord0 = TexCoord0;",
-       "  FragTexCoord1 = TexCoord1;",
-       "}",
-       ""
-      ].join('\n'); 
-    },
-
-    getFragmentShader: function() {
-    return [
-      "",
-      "#ifdef GL_ES",
-      "precision highp float;",
-      "#endif",
-      "varying vec4 VertexColor;",
-      "uniform int ArrayColorEnabled;",
-      "vec4 fragColor;",
-      "varying vec2 FragTexCoord0;",
-      "uniform sampler2D Texture0;",
-      "uniform float Texture0Opacity;",
-      "vec4 texColor0;",
-      "uniform bool Texture0Visible;",
-      "uniform float Texture1Opacity;",
-      "varying vec2 FragTexCoord1;",
-      "uniform sampler2D Texture1;",
-      "vec4 texColor1;",
-      "uniform bool Texture1Visible;",
-      "void main(void) {",
-      "  fragColor = VertexColor;",
-      "  if (Texture0Visible){",
-      "    texColor0 = texture2D( Texture0, FragTexCoord0.xy );",
-      "  }",
-      " else {",
-      "     texColor0 = vec4(0,0,0,0);",
-      " };",
-      " fragColor = vec4(mix(fragColor.rgb,texColor0.rgb,texColor0.a * Texture0Opacity),1);",
-      " texColor0 = vec4(1,1,1,1);",
-      " if (Texture1Visible){",
-      "   texColor1 = texture2D( Texture1, FragTexCoord1.xy );",
-      " }",
-      " else {",
-      "   texColor1 = vec4(1,0,0,0);",
-      " };",
-      " fragColor = vec4(mix(fragColor.rgb,texColor1.rgb,texColor1.a * Texture1Opacity),1);",
-      " texColor1 = vec4(1,1,1,1);",
-      " fragColor = fragColor * texColor0;",
-      " fragColor = fragColor * texColor1;",
-      " gl_FragColor = fragColor;",
-      "}",
-      
-     ].join('\n');
-
     }
-
 };
 
 //...................................................................
@@ -790,7 +995,7 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
         //var tris = new osg.DrawElements(gl.LINE_STRIP, osg.BufferArray.create(gl.ELEMENT_ARRAY_BUFFER, elements, 1));
         this.geometry.getPrimitives().push(tris);
 
-        // the textures:
+        // the textures:        
         for (var i = 0, n = this.map.imageLayers.length; i < n; i++) {
             var layer = this.map.imageLayers[i];
             var tex = layer.createTexture(this.key, this.map.profile);
