@@ -79,12 +79,12 @@
             var eye = [];
             osg.Matrix.getTrans(viewMatrix, eye);
             var lla = map.profile.ellipsoid.ecef2lla(eye);
-            lla[0] = osgearth.rad2deg(lla[0]);
-            lla[1] = osgearth.rad2deg(lla[1]);
+            lla[0] = Math.rad2deg(lla[0]);
+            lla[1] = Math.rad2deg(lla[1]);
             jQuery("#Coords").html(
                 "Lat: " + lla[1].toFixed(2) + "\u00B0" + "  Long = " + lla[0].toFixed(2) + "\u00B0" + "<br/>" +
-                "Azim: " + osgearth.rad2deg(mapView.viewer.manipulator.localAzim).toFixed(1) + "\u00B0" +
-                "  Pitch:" + osgearth.rad2deg(mapView.viewer.manipulator.localPitch).toFixed(1) + "\u00B0");
+                "Azim: " + Math.rad2deg(mapView.viewer.manipulator.localAzim).toFixed(1) + "\u00B0" +
+                "  Pitch:" + Math.rad2deg(mapView.viewer.manipulator.localPitch).toFixed(1) + "\u00B0");
         };
     });
 

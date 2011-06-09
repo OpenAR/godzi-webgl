@@ -133,6 +133,7 @@ godzi.EarthManipulator.prototype = osg.objectInehrit( godzi.Manipulator.prototyp
     },
 
     dblclick: function(ev) {
+        this.zoomModel(0, 1);
     },
 
     touchDown: function(ev) {
@@ -434,6 +435,10 @@ godzi.MapView = function(elementId, size, map) {
     this.viewer.eventNode = this.viewer.canvas;
  
     this.viewer.init();
+    
+    // replace with out own custom State object!
+    //this.viewer.state = new osgearth.State();
+    
     if ( map.geocentric )
         this.viewer.setupManipulator(new godzi.EarthManipulator(map));
     else

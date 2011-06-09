@@ -38,7 +38,8 @@ godzi.TMSImageLayer.prototype = osg.objectInehrit(osgearth.ImageLayer.prototype,
 
     createTexture: function(key, profile) {
         var imageURL = this.getURL(key, profile);
-        return osgearth.Texture.create(imageURL);
+        return osg.Texture.create(imageURL);
+        //return osgearth.Texture.create(imageURL);
     }
 });
 
