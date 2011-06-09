@@ -230,6 +230,10 @@ godzi.Icon = function(id, lon, lat, alt, url, options) {
                         '" width="' + this.width + '" height="' + this.height +
 						(options.title != undefined ? '" title="' + options.title : '') + '"/>');
 						
+  //Disable selection
+  this.element[0].onselectstart = function() { return false;} //id;
+  this.element[0].onmousedown   = function() { return false;} //id;
+						
   jQuery("body").append(this.element);                         
 }
 
@@ -277,6 +281,10 @@ godzi.Label = function(id, lon, lat, alt, text, options) {
   this.class = options.class;
   
   this.element = jQuery('<span id="' + this.id + '" class="' + options.class + '">' + this.text + '</span>');
+  //Disable selection
+  this.element[0].onselectstart = function() { return false;} //id;
+  this.element[0].onmousedown   = function() { return false;} //id;
+
   jQuery("body").append(this.element);                         
 }
 
