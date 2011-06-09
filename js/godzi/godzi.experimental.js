@@ -79,13 +79,20 @@ godzi.PlaceSearch.doSearch = function(place, callback)
 
 //........................................................................
 
-godzi.PositionedElement = function(id, lon, lat, alt) {
+godzi.PositionedElement = function(id, lon, lat, alt, options) {
+  if (options !== undefined) {
+    if (options.element !== undefined) {
+      this.element = options.element;
+    }    
+  }
   this.id = id;
-  this.ownsElement = true;
-  this.element = jQuery("#" + id);
-  //If we found an existing element we don't own it
-  if (this.element) {
-    this.ownsElement = false;    
+  this.ownsElement = this.element !== undefined;
+  if (this.element === undefined) {
+    this.element = jQuery("#" + id);
+    //If we found an existing element we don't own it
+    if (this.element) {
+        this.ownsElement = false;    
+    }
   }
   this.lat = lat;
   this.lon = lon;
@@ -167,7 +174,8 @@ godzi.PositionedElement.prototype = {
         my: "left top",
         at: "left top",
         of: mapView.viewer.canvas,
-        offset: x + " " + y
+        offset: x + " " + y,
+        collision: "none none"
       });      
       
       this.lastWindow = [x,y];                       
