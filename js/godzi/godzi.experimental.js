@@ -181,7 +181,10 @@ godzi.Icon = function(id, lon, lat, alt, url, options) {
   this.height = options.height;
   this.class = options.class;
   
-  this.element = jQuery('<img id="' + this.id + '" class="' + options.class + '" src="' + url + '" width="' + this.width + '" height="' + this.height + '"/>');
+  this.element = jQuery('<img id="' + this.id + '" class="' + options.class + '" src="' + url +
+                        '" width="' + this.width + '" height="' + this.height +
+						(options.title != undefined ? '" title="' + options.title : '') + '"/>');
+						
   jQuery("body").append(this.element);                         
 }
 
