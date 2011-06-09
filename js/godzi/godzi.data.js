@@ -171,6 +171,21 @@ godzi.GeoRSSLayer = function(mapView, url, rate, iconOptions) {
 	this.reader = new godzi.GeoRSSReader(url, rate, function(items) { thisObj.createIcons(items); });
 };
 
+
+function showDialog(content, title) {                  
+    //Create a new div on the fly
+    return $('<div/>').html(content).dialog({
+      bgiframe : true,
+      resizable: false,
+      modal: false,
+      title: title,
+      overlay: {
+        backgroundColor: '#000',
+        opacity: 0.5
+      }
+    });
+}
+
 godzi.GeoRSSLayer.prototype = {
     setRate: function(newRate) {
         this.reader.setRate(newRate);	
@@ -190,12 +205,23 @@ godzi.GeoRSSLayer.prototype = {
             });
 			
 			icon.offset = [this.options.width / -2, this.options.height * -1];
-			icon.element.bind("click", {url: items[i].link}, function(e) {					  
-			    if (e.data.url !== undefined && e.data.url != null) {
-  			      window.open(e.data.url);
-			    }
-			});
-			
+            icon.element.bind("click", {url: items[i].link,
+			                            title: items[i].title,
+			                            engine: this.positionEngine,
+			                            lat: items[i].latitude,
+			                            lon: items[i].longitude,
+			                            description: items[i].description			                            			                            
+			                            }, function(e) {					  
+  			      var html = "<div><h3>" + e.data.title + "</h3>" + 
+  			                 "   <p> " + e.data.description + "</p>";
+  			      if (e.data.url !== undefined && e.data.url != null) {
+  			        html += '<a href="' + e.data.url + '" target="_blank">Link</a>';
+  			      }
+  			      html += "</div>";
+  			      var dlg = showDialog(html, e.data.title);
+  			      dlg = dlg.parent();
+  			      e.data.engine.addElement(new godzi.PositionedElement("dlg", Math.deg2rad(e.data.lon), Math.deg2rad(e.data.lat), 0, {element: dlg, vAlign: "bottom"}));
+			    });			
             this.positionEngine.addElement( icon );
 		}
 	}
