@@ -190,6 +190,11 @@ godzi.GeoRSSLayer.prototype = {
             });
 			
 			icon.offset = [this.options.width / -2, this.options.height * -1];
+			icon.element.bind("click", {url: items[i].link}, function(e) {					  
+			    if (e.data.url !== undefined && e.data.url != null) {
+  			      window.open(e.data.url);
+			    }
+			});
 			
             this.positionEngine.addElement( icon );
 		}
