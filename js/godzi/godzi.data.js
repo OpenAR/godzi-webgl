@@ -5,8 +5,8 @@
 * http://godzi.org
 */
  
-godzi.Map = function() {
-    osgearth.Map.call(this);
+godzi.Map = function(args) {
+    osgearth.Map.call(this, args);
 };
 
 godzi.Map.prototype = osg.objectInehrit(osgearth.Map.prototype, {

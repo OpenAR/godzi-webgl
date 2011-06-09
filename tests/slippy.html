@@ -61,11 +61,11 @@
     godzi.init("../js/", function() {
 
         // create a map model:
-        var map = new godzi.Map();
-
-        map.profile = new osgearth.MercatorProfile();
-        map.geocentric = false;
-        map.threeD = false;
+        var map = new godzi.Map({
+            profile: new osgearth.MercatorProfile(),
+            threeD: false,
+            geocentric: false
+        });
 
         map.addImageLayer(new godzi.TMSImageLayer({
             name: "OSM",
@@ -81,7 +81,7 @@
         var mapView = new godzi.MapView("3DView", size, map);
 
         // display the Lat/Long:
-        mapView.addFrameEndCallback( function() {
+        mapView.addFrameEndCallback(function() {
             var xy = mapView.viewer.manipulator.center;
             var lla = map.world2lla(xy);
             lla[0] = Math.rad2deg(lla[0]);

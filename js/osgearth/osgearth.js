@@ -721,15 +721,33 @@ osgearth.ImageLayer.prototype = {
 
 //...................................................................
 
-osgearth.Map = function() {
-    this.profile = new osgearth.GeodeticProfile();
-    this.usingDefaultProfile = true;
+osgearth.Map = function(args) {
+
+    this.usingDefaultProfile = false;
+
+    // whether it's a 2D or 3D map
+    this.threeD = true;
 
     // whether the map is round (geocentric) or flat (projected)
     this.geocentric = true;
 
-    // whether this is a 3D or a 2D map
-    this.threeD = true;
+    if (args !== undefined) {
+        if (args.profile !== undefined)
+            this.profile = args.profile;
+        if (args.threeD !== undefined)
+            this.threeD = args.threeD;
+        if (args.twoD != undefined)
+            this.threeD = (args.twoD !== true);
+        if (args.geocentric !== undefined)
+            this.geocentric = args.geocentric;
+        else if (this.threeD === false)
+            this.geocentric = false;
+    }
+
+    if (this.profile === undefined) {
+        this.profile = new osgearth.GeodeticProfile();
+        this.usingDefaultProfile = true;
+    }
 
     // ordered list of image layers in the map
     this.imageLayers = [];
