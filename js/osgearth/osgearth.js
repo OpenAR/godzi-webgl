@@ -195,19 +195,23 @@ osgearth.ShaderFactory.createFragmentApplyTexturing = function(imageLayers) {
     for (var unit = 0; unit < imageLayers.length; unit++) {
         buf += "varying vec2 FragTexCoord" + unit + ";\n";
         buf += "uniform sampler2D Texture" + unit + ";\n";
+        buf += "uniform bool Texture" + unit + "Visible;\n";
+        buf += "uniform float Texture" + unit + "Opacity;\n";
     }
-    
+
     buf += "void osgearth_frag_applyTexturing(inout vec4 color) {\n";
     buf += "    vec4 texel;\n";
 
     for (var unit = 0; unit < imageLayers.length; unit++) {
-        buf += "    texel = texture2D(Texture" + unit + ", FragTexCoord" + unit + ".xy );\n";
-        buf += "    color = vec4( mix( color.rgb, texel.rgb, texel.a ), 1);\n";
+        buf += "    if (Texture" + unit + "Visible) { \n";
+        buf += "        texel = texture2D(Texture" + unit + ", FragTexCoord" + unit + ".xy );\n";
+        buf += "        color = vec4( mix( color.rgb, texel.rgb, texel.a * Texture" + unit + "Opacity), 1);\n";
+        buf += "    } \n";
     }
-    
+
     buf += "}\n";
-    
-    return buf;    
+
+    return buf;
 };
 
 //........................................................................
@@ -310,7 +314,7 @@ osgearth.VirtualProgram.prototype = osg.objectInehrit(osg.Program.prototype, {
 
             // check for new user functions
             this.refreshAccumulatedFunctions(state);
-            
+
             // rebuild the shaders
             this.refreshMains();
 
@@ -358,6 +362,9 @@ osgearth.VirtualProgram.prototype = osg.objectInehrit(osg.Program.prototype, {
 
             // cache this gl program.
             this.programCache[accumulatedSemantic] = this.program;
+
+            osg.log(vertShaderSource);
+            osg.log(fragShaderSource);
         }
 
         gl.useProgram(this.program);
@@ -672,59 +679,6 @@ osgearth.TileKey = {
 
 //...................................................................
 
-/**
- * Custom texture class that customizes the fragment shader
- */
-osgearth.Texture = function() {
-
-    osg.Texture.call(this);
-    
-    var fragInit = function(unit) {
-        var str = "varying vec2 FragTexCoord" + unit + ";\n";
-        str += "uniform sampler2D Texture" + unit + ";\n";
-        str += "vec4 texColor" + unit + ";\n";
-        str += "uniform bool Texture" + unit + "Visible;\n";
-        return str;
-    };
-    this.setShaderGeneratorFunction(fragInit, osg.ShaderGeneratorType.FragmentInit);
-
-    var fragMain = function(unit) {
-//        var str = "texColor" + unit + " = texture2D( Texture" + unit + ", FragTexCoord" + unit + ".xy );\n";
-//        str += "fragColor = vec4(mix(fragColor.rgb,texColor" + unit + ".rgb,texColor" + unit + ".a),1);\n";
-//        return str;
-        
-        var str = "if (Texture" + unit + "Visible) { \n";
-        str += "  texColor" + unit + " = texture2D( Texture" + unit + ", FragTexCoord" + unit + ".xy );\n";
-        str += "}\n";
-        str += "else {\n";
-        str += "  texColor" + unit + " = vec4(1,0,0,1);\n";
-        str += "};\n";                
-        str += "  fragColor = vec4(mix(fragColor.rgb,texColor" + unit + ".rgb,texColor" + unit + ".a),1);\n";
-        return str;        
-    };
-    this.setShaderGeneratorFunction(fragMain, osg.ShaderGeneratorType.FragmentMain);
-};
-
-osgearth.Texture.prototype = osg.objectInehrit(osg.Texture.prototype, {
-    cloneType: function() { 
-        var t = new osgearth.Texture(); 
-        t.default_type = true; 
-        return t;
-    }
-});
-
-osgearth.Texture.create = function(imageSource) {
-    var a = new osgearth.Texture();
-    if (imageSource !== undefined) {
-        var img = new Image();
-        img.src = imageSource;
-        a.setImage(img);
-    }
-    return a;
-};
-
-//...................................................................
-
 osgearth.ImageLayer = function(name) {
     this.name = name;
     this.profile = undefined;
@@ -788,7 +742,7 @@ osgearth.Map = function() {
     this.drawListSize = 0;
 
     // don't subdivide beyond this level
-    this.maxLevel = 3;
+    this.maxLevel = 22;
 };
 
 osgearth.Map.prototype = {
@@ -823,6 +777,8 @@ osgearth.Map.prototype = {
                 node.addChild(new osgearth.Tile([x, y, 0], this, null));
             }
         }
+        
+        var stateSet = node.getOrCreateStateSet();
 
         // set up our custom GLSL program
         var vp = new osgearth.VirtualProgram();
@@ -832,50 +788,34 @@ osgearth.Map.prototype = {
             gl.VERTEX_SHADER,
             osgearth.ShaderFactory.createVertexSetupTexturing(this.imageLayers));
 
-//        vp.setShader(
-//            "osgearth_vert_setupLighting",
-//            gl.VERTEX_SHADER,
-        //            osgeath.ShaderFactory.createVertexSetupLighting(this.imageLayers));
-
         vp.setShader(
             "osgearth_frag_applyTexturing",
             gl.FRAGMENT_SHADER,
             osgearth.ShaderFactory.createFragmentApplyTexturing(this.imageLayers));
 
-//        vp.setShader(
-//            "osgearth_frag_applyLighting",
-//            gl.FRAGMENT_SHADER,
-        //            osgearth.ShaderFactory.createFragmentApplyLighting(this.imageLayers));
 
-        node.getOrCreateStateSet().setAttributeAndMode(vp, osg.StateAttribute.ON);
+        stateSet.setAttributeAndMode(vp, osg.StateAttribute.ON);
 
-        node.getOrCreateStateSet().setAttributeAndMode(new osg.CullFace('DISABLE'));
+        stateSet.setAttributeAndMode(new osg.CullFace('DISABLE'));
 
         this.node = node;
 
         for (var i = 0; i < this.imageLayers.length; i++) {
+
             var visible = this.imageLayers[i].getVisible() ? true : false;
             var visibleUniform = osg.Uniform.createInt1(visible, "Texture" + i + "Visible");
-            this.node.getOrCreateStateSet().addUniform(visibleUniform, osg.StateAttribute.ON | osg.StateAttribute.OVERRIDE);
+            stateSet.addUniform(visibleUniform, osg.StateAttribute.ON | osg.StateAttribute.OVERRIDE);
             this.imageLayers[i].visibleUniform = visibleUniform;
 
             var opacity = this.imageLayers[i].getOpacity();
             var opacityUniform = osg.Uniform.createFloat1(opacity, "Texture" + i + "Opacity");
-            this.node.getOrCreateStateSet().addUniform(opacityUniform, osg.StateAttribute.ON | osg.StateAttribute.OVERRIDE);
+            stateSet.addUniform(opacityUniform, osg.StateAttribute.ON | osg.StateAttribute.OVERRIDE);
             this.imageLayers[i].opacityUniform = opacityUniform;
-            this.node.getOrCreateStateSet().addUniform(opacityUniform, osg.StateAttribute.ON | osg.StateAttribute.OVERRIDE);
-        }
+            stateSet.addUniform(opacityUniform, osg.StateAttribute.ON | osg.StateAttribute.OVERRIDE);
 
-        /*
-        var program = osg.Program.create(
-        osg.Shader.create(gl.VERTEX_SHADER, this.getVertexShader()),
-        osg.Shader.create(gl.FRAGMENT_SHADER, this.getFragmentShader())
-        );
-        node.getOrCreateStateSet().setAttributeAndMode(program, osg.StateAttribute.ON | osg.StateAttribute.OVERRIDE);
-        */
-        //        node.getOrCreateStateSet().addUniform(osg.Uniform.createInt1(0, "Texture0"));
-        //        node.getOrCreateStateSet().addUniform(osg.Uniform.createInt1(1, "Texture1"));        
-        //        
+            stateSet.addUniform(osg.Uniform.createInt1(i, "Texture" + i));
+        }
+        
         return node;
     },
 
@@ -900,94 +840,7 @@ osgearth.Map.prototype = {
         delete this.drawList;
         this.drawList = {};
         this.drawListSize = 0;
-    },
-
-    getVertexShader: function() {
-        return [
-       "",
-       "#ifdef GL_ES",
-       "precision highp float;",
-       "#endif",
-       "attribute vec3 Vertex;",
-       "attribute vec4 Color;",
-       "attribute vec3 Normal;",
-       "uniform int ArrayColorEnabled;",
-       "uniform mat4 ModelViewMatrix;",
-       "uniform mat4 ProjectionMatrix;",
-       "uniform mat4 NormalMatrix;",
-       "varying vec4 VertexColor;",
-       "attribute vec2 TexCoord0;",
-       "varying vec2 FragTexCoord0;",
-       "attribute vec2 TexCoord1;",
-       "varying vec2 FragTexCoord1;",
-       "uniform vec4 MaterialAmbient;",
-       "uniform vec4 MaterialDiffuse;",
-       "uniform vec4 MaterialSpecular;",
-       "uniform vec4 MaterialEmission;",
-       "uniform float MaterialShininess;",
-       "vec4 Ambient;",
-       "vec4 Diffuse;",
-       "vec4 Specular;",
-       "vec4 ftransform() {",
-       "  return ProjectionMatrix * ModelViewMatrix * vec4(Vertex, 1.0);",
-       "}",
-       "void main(void) {",
-       "  gl_Position = ftransform();",
-       "  if (ArrayColorEnabled == 1) VertexColor = Color;",
-       "  else VertexColor = vec4(1.0,1.0,1.0,1.0);",
-       "  FragTexCoord0 = TexCoord0;",
-       "  FragTexCoord1 = TexCoord1;",
-       "}",
-       ""
-      ].join('\n');
-    },
-
-    getFragmentShader: function() {
-        return [
-      "",
-      "#ifdef GL_ES",
-      "precision highp float;",
-      "#endif",
-      "varying vec4 VertexColor;",
-      "uniform int ArrayColorEnabled;",
-      "vec4 fragColor;",
-      "varying vec2 FragTexCoord0;",
-      "uniform sampler2D Texture0;",
-      "uniform float Texture0Opacity;",
-      "vec4 texColor0;",
-      "uniform bool Texture0Visible;",
-      "uniform float Texture1Opacity;",
-      "varying vec2 FragTexCoord1;",
-      "uniform sampler2D Texture1;",
-      "vec4 texColor1;",
-      "uniform bool Texture1Visible;",
-      "void main(void) {",
-      "  fragColor = VertexColor;",
-      "  if (Texture0Visible){",
-      "    texColor0 = texture2D( Texture0, FragTexCoord0.xy );",
-      "  }",
-      " else {",
-      "     texColor0 = vec4(0,0,0,0);",
-      " };",
-      " fragColor = vec4(mix(fragColor.rgb,texColor0.rgb,texColor0.a * Texture0Opacity),1);",
-      " texColor0 = vec4(1,1,1,1);",
-      " if (Texture1Visible){",
-      "   texColor1 = texture2D( Texture1, FragTexCoord1.xy );",
-      " }",
-      " else {",
-      "   texColor1 = vec4(1,0,0,0);",
-      " };",
-      " fragColor = vec4(mix(fragColor.rgb,texColor1.rgb,texColor1.a * Texture1Opacity),1);",
-      " texColor1 = vec4(1,1,1,1);",
-      " fragColor = fragColor * texColor0;",
-      " fragColor = fragColor * texColor1;",
-      " gl_FragColor = fragColor;",
-      "}",
-
-     ].join('\n');
-
     }
-
 };
 
 //...................................................................
@@ -1142,7 +995,7 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
         //var tris = new osg.DrawElements(gl.LINE_STRIP, osg.BufferArray.create(gl.ELEMENT_ARRAY_BUFFER, elements, 1));
         this.geometry.getPrimitives().push(tris);
 
-        // the textures:
+        // the textures:        
         for (var i = 0, n = this.map.imageLayers.length; i < n; i++) {
             var layer = this.map.imageLayers[i];
             var tex = layer.createTexture(this.key, this.map.profile);
