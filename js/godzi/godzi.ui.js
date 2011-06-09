@@ -12,6 +12,19 @@
 
 //........................................................................
 
+osg.Matrix.equals = function(a,b) {
+  if (a == b) return true;
+  
+  if (a.length != b.length) return false;
+  
+  for (var i = 0; i < a.length; i++) {
+    if (a[i] != b[i]) return false;
+  }
+  return true;
+}
+
+//........................................................................
+
 godzi.Manipulator = function(map) {
     this.map = map;
     this.center = [0, 0, 0];
@@ -122,6 +135,8 @@ godzi.EarthManipulator.prototype = osg.objectInehrit( godzi.Manipulator.prototyp
 
         if (ev.shiftKey)
             this.rotateModel(-deltaX, -deltaY);
+        else if (ev.ctrlKey)
+            this.zoomModel(0, -deltaY);
         else
             this.panModel(-deltaX, -deltaY);
 
@@ -133,7 +148,6 @@ godzi.EarthManipulator.prototype = osg.objectInehrit( godzi.Manipulator.prototyp
     },
 
     dblclick: function(ev) {
-        this.zoomModel(0, 1);
     },
 
     touchDown: function(ev) {
@@ -403,13 +417,6 @@ godzi.MapManipulator.prototype = osg.objectInehrit(godzi.Manipulator.prototype, 
     mousewheel: function(ev, intDelta, deltaX, deltaY) {
         this.zoomModel(0, intDelta * 0.1);
     },
-
-    keydown: function(ev) {
-        if (ev.keyCode === 32) { // spacebar
-            this.computeHomePosition();
-        }
-    },
-
 } );
 
 //........................................................................
@@ -435,10 +442,6 @@ godzi.MapView = function(elementId, size, map) {
     this.viewer.eventNode = this.viewer.canvas;
  
     this.viewer.init();
-    
-    // replace with out own custom State object!
-    //this.viewer.state = new osgearth.State();
-    
     if ( map.geocentric )
         this.viewer.setupManipulator(new godzi.EarthManipulator(map));
     else
@@ -452,19 +455,53 @@ godzi.MapView = function(elementId, size, map) {
     //catch (er) {
     //osg.log("exception in osgViewer " + er);
     //}
+    
+    this.frameEnd=[];
 };
 
 godzi.MapView.prototype = {
+
+    home: function() {
+        this.viewer.getManipulator().computeHomePosition();
+    },
+    
+    projectObjectIntoWindow: function(object) {
+        var viewMatrix = this.viewer.view.getViewMatrix();
+        var projectionMatrix = this.viewer.view.getProjectionMatrix();
+        var windowMatrix = null;
+        var vp = this.viewer.view.getViewport();
+        if (vp !== undefined) {
+        windowMatrix = vp.computeWindowMatrix();
+        }
+
+        var matrix = []; 
+        osg.Matrix.copy(windowMatrix, matrix);
+        osg.Matrix.preMult(matrix, projectionMatrix);
+        osg.Matrix.preMult(matrix, viewMatrix);
+
+        var result = osg.Matrix.transformVec3(matrix, object);
+        var height = this.viewer.canvas.height;
+        result[1] = height - result[1] - 1;
+        return result;
+    },
 
     run: function() {
         var that = this;
         var render = function() {
             window.requestAnimationFrame(render, this.canvas);
             that.viewer.frame();
-            if (that.onFrameEnd !== undefined && that.onFrameEnd != null)
-                that.onFrameEnd();
             that.map.frame();
+            if (that.frameEnd !== undefined && that.frameEnd != null) {
+            //Fire off any frame end callbacks
+                for (var i = 0; i < that.frameEnd.length; i++) {
+                  that.frameEnd[i]();
+                }
+            }
         };
         render();
+    },
+    
+    addFrameEndCallback: function(callback) {
+      this.frameEnd.push( callback );
     }
 };
