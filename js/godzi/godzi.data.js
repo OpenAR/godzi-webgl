@@ -20,6 +20,7 @@ godzi.TMSImageLayer = function(settings) {
     this.flipY = settings.tmsType === "google";
     this.extension = settings.imageType !== undefined ? settings.imageType : "jpg";
     this.baseLevel = settings.baseLevel !== undefined ? settings.baseLevel : 0;
+    this.args = settings.args !== undefined ? settings.args : null;
 };
 
 godzi.TMSImageLayer.prototype = osg.objectInehrit(osgearth.ImageLayer.prototype, {
@@ -33,6 +34,9 @@ godzi.TMSImageLayer.prototype = osg.objectInehrit(osgearth.ImageLayer.prototype,
         }
 
         var imageURL = this.url + "/" + (key[2] + this.baseLevel) + "/" + key[0] + "/" + y + "." + this.extension;
+        if (this.args !== undefined && this.args != null) {
+          imageURL += "?" + this.args;
+        }
         return imageURL;
     },
 
