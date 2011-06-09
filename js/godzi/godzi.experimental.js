@@ -80,11 +80,30 @@ godzi.PlaceSearch.doSearch = function(place, callback)
 //........................................................................
 
 godzi.PositionedElement = function(id, lon, lat, alt, options) {
-  if (options !== undefined) {
-    if (options.element !== undefined) {
-      this.element = options.element;
-    }    
-  }
+  this.hAlign = "left";
+  this.vAlign = "top";
+  this.lat = lat;
+  this.lon = lon;
+  this.alt = alt;
+  this.offset = [0,0];
+  this.ecf = null;
+  this._dirty = true;
+  
+  var defaults = {
+    hAlign: "left",
+    vAlign: "top",
+    offset: [0,0]
+  };
+  
+  var options = jQuery.extend({}, defaults, options);     
+  
+  this.vAlign = options.vAlign;
+  this.hAlign = options.hAlign;
+  
+  if (options.element !== undefined) {
+     this.element = options.element;
+  }    
+  
   this.id = id;
   this.ownsElement = this.element !== undefined;
   if (this.element === undefined) {
@@ -94,12 +113,7 @@ godzi.PositionedElement = function(id, lon, lat, alt, options) {
         this.ownsElement = false;    
     }
   }
-  this.lat = lat;
-  this.lon = lon;
-  this.alt = alt;
-  this.offset = [0,0];
-  this.ecf = null;
-  this._dirty = true;
+  
 }
 
 godzi.PositionedElement.prototype = {  
@@ -138,22 +152,25 @@ godzi.PositionedElement.prototype = {
       //Save the last view matrix
       this._lastViewMatrix = [];
       osg.Matrix.copy(viewMatrix, this._lastViewMatrix);
-            
-      viewMatrix = osg.Matrix.inverse(viewMatrix);
-      var eye = [];      
-      osg.Matrix.getTrans(viewMatrix, eye);
-                
-      var lookVector = [];
-      osg.Vec3.sub( this.ecf, eye, lookVector );         
-      
-      var worldUp = [];
-      osg.Vec3.copy(this.ecf, worldUp);
-      osg.Vec3.normalize( worldUp, worldUp );
-      var dot = osg.Vec3.dot(lookVector, worldUp);
-      if (dot > 0) {
-        this.element.offset({top:0, left:-10000});
-        return;
-      }                  
+                        
+      //Cluster cull geocentric
+      if (mapView.map.geocentric) {
+          viewMatrix = osg.Matrix.inverse(viewMatrix);
+          var eye = [];      
+          osg.Matrix.getTrans(viewMatrix, eye);
+                    
+          var lookVector = [];
+          osg.Vec3.sub( this.ecf, eye, lookVector );         
+
+          var worldUp = [];
+          osg.Vec3.copy(this.ecf, worldUp);
+          osg.Vec3.normalize( worldUp, worldUp );
+          var dot = osg.Vec3.dot(lookVector, worldUp);
+          if (dot > 0) {
+            this.element.offset({top:0, left:-10000});
+            return;
+          }                  
+      }
            
       var window = mapView.projectObjectIntoWindow(this.ecf);      
       
@@ -169,6 +186,14 @@ godzi.PositionedElement.prototype = {
             return;
         } 
       }
+      
+      if (this.hAlign == "right") {
+        x = x - this.element.width();
+      }
+      
+      if (this.vAlign == "bottom") {
+        y = y - this.element.height();
+      }      
           
       this.element.position( {        
         my: "left top",
