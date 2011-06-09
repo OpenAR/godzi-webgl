@@ -117,12 +117,6 @@
             tmsType: "google"
         }));
 
-        //map.addImageLayer(new godzi.TMSImageLayer({
-        //    name: "OSM",
-        //    url: "http://readymap.org/readymap/tiles/1.0.0/35/",
-        //    tmsType: "google"
-        //}));
-
         // create a view tied to a page element:
         var size = godzi.getWindowSize();
         var headerHeight = jQuery('#header').height();
@@ -151,7 +145,7 @@
 		
 		//Add GeoRSSLayer
 		var proxy = "http://demo.pelicanmapping.com/rmweb/proxy.php?url=";
-		var feedUrl = "http://earthquake.usgs.gov/earthquakes/catalogs/eqs7day-M5.xml";
+		var feedUrl = "http://api.flickr.com/services/feeds/geo/?tags=cat&format=rss_200";
 		var rssLayer = new godzi.GeoRSSLayer(mapView, proxy + feedUrl, 60, "../images/earthquake.png");
 		
 		//Add GeoRSSList
@@ -186,7 +180,7 @@
   <div id="Search">
   </div>
   <div id="RSSPanelParent">
-      Earthquakes:</br>
+      Cat Photos:</br>
       <div id="RSSPanel">
       </div>
   </div>

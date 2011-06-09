@@ -95,7 +95,7 @@ godzi.controls.GeoRSSList.prototype = {
 	  var itemDiv;
 	  if (classid == undefined)
 	  {
-	    itemDiv = $('<div style="padding: 4px;' + (i == 0 ? '' : ' border-top: 1px dotted #999;') + '">' + value.title + (value.link == undefined || value.link.length < 0 ? '' : '...<a href="' + value.link + '">Details</a>') + '</div>');
+	    itemDiv = $('<div style="padding: 4px;' + (i == 0 ? '' : ' border-top: 1px dotted #999;') + '">' + value.title + (value.link == undefined || value.link.length < 0 ? '' : '...<a href="' + value.link + '" target="_blank">Details</a>') + '</div>');
 		$(itemDiv).hover(
 		  function() {
 		    $(this).css("color", "#09f");

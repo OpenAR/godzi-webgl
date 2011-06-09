@@ -97,14 +97,16 @@ godzi.GeoRSSReader.prototype = {
 					    lon = $(this).find('geo\\:long').text();
 					}
 					
-					var links = this.getElementsByTagName("link");
+					var link = $(this).find('link').eq(0).attr('href');
+					if (link == undefined || link == "")
+					  link = $(this).find('link').eq(0)[0].nextSibling.data;
 					
 					items.push({ guid: $(this).find('guid').text(),
 					             title: $(this).find('title').text(),
 								 author: $(this).find('author').text(),
 								 pubDate: $(this).find('pubDate').text(),
 								 description: $(this).find('description').text(),
-								 link: $(this).find('link').eq(0).attr('href'),
+								 link: link,
 								 latitude: lat,
 								 longitude: lon,
 								 src: $(this).get() });
