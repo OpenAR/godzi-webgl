@@ -153,10 +153,17 @@ godzi.GeoRSSReader.prototype = {
 
 //...................................................................
 
-godzi.GeoRSSLayer = function(mapView, url, rate, iconUrl) {
+godzi.GeoRSSLayer = function(mapView, url, rate, iconOptions) {
     this.mapView = mapView;
     this.url = url;
-	this.iconUrl = iconUrl != undefined ? iconUrl : "http://google-maps-icons.googlecode.com/files/redblank.png";
+	
+	var defaults = {
+	  url: "http://google-maps-icons.googlecode.com/files/redblank.png",
+      width: 32,
+      height: 32,
+      class: ""
+    };
+    this.options = jQuery.extend({}, defaults, iconOptions);
 	
 	this.positionEngine = new godzi.PositionEngine(mapView);
 	
@@ -174,11 +181,15 @@ godzi.GeoRSSLayer.prototype = {
 		
 		for (var i in items)
 		{
-		    var icon = new godzi.Icon("icon" + i + "_" + items[i].guid, Math.deg2rad(items[i].longitude), Math.deg2rad(items[i].latitude), 0, this.iconUrl, {
-              width: 32,
-              height: 32,
+		    var icon = new godzi.Icon("icon" + i + "_" + items[i].guid, Math.deg2rad(items[i].longitude), Math.deg2rad(items[i].latitude), 0, this.options.url, {
+              width: this.options.width,
+              height: this.options.height,
+			  class: this.options.class,
 			  title: items[i].title
             });
+			
+			icon.offset = [this.options.width / -2, this.options.width * -1];
+			
             this.positionEngine.elements.push( icon );   
 		}
 	}

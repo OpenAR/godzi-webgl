@@ -152,7 +152,7 @@
 		//Add GeoRSSLayer
 		var proxy = "http://demo.pelicanmapping.com/rmweb/proxy.php?url=";
 		var feedUrl = "http://earthquake.usgs.gov/earthquakes/catalogs/eqs7day-M5.xml";
-		var rssLayer = new godzi.GeoRSSLayer(mapView, proxy + feedUrl, 60, "../images/earthquake.png");
+		var rssLayer = new godzi.GeoRSSLayer(mapView, proxy + feedUrl, 60, { url: "../images/earthquake.png" });
 		
 		//Add GeoRSSList
 		var rssPanel = new godzi.controls.GeoRSSList("RSSPanel", mapView);

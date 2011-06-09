@@ -146,7 +146,7 @@
 		//Add GeoRSSLayer
 		var proxy = "http://demo.pelicanmapping.com/rmweb/proxy.php?url=";
 		var feedUrl = "http://api.flickr.com/services/feeds/geo/?tags=cat&format=rss_200";
-		var rssLayer = new godzi.GeoRSSLayer(mapView, proxy + feedUrl, 60, "../images/earthquake.png");
+		var rssLayer = new godzi.GeoRSSLayer(mapView, proxy + feedUrl, 60, { url: "http://google-maps-icons.googlecode.com/files/photo.png" });
 		
 		//Add GeoRSSList
 		var rssPanel = new godzi.controls.GeoRSSList("RSSPanel", mapView);
