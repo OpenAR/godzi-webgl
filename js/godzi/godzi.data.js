@@ -189,7 +189,7 @@ godzi.GeoRSSLayer.prototype = {
 			  title: items[i].title
             });
 			
-			icon.offset = [this.options.width / -2, this.options.width * -1];
+			icon.offset = [this.options.width / -2, this.options.height * -1];
 			
             this.positionEngine.addElement( icon );
 		}
