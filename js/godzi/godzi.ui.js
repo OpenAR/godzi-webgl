@@ -373,6 +373,12 @@ godzi.MapManipulator.prototype = osg.objectInehrit(godzi.Manipulator.prototype, 
         this.maxDistance = this.distance * 1.5;        
     },
     
+    setViewpoint: function(lat, lon, alt, heading, pitch, range) {
+        var lla = [Math.deg2rad(lon), Math.deg2rad(lat), alt];
+        this.center = this.map.lla2world(lla);
+        this.setDistance(range);
+    },
+    
     panModel: function(dx, dy) {
         var scale = -0.3 * this.distance;
         this.center = osg.Vec3.add(this.center, [dx*scale, dy*scale, 0], []);
