@@ -91,6 +91,17 @@ osg.Quat.rotateVecOnToVec = function(from, to, r) {
     return r;
 };
 
+osg.Matrix.equals = function(a,b) {
+  if (a == b) return true;
+  
+  if (a.length != b.length) return false;
+  
+  for (var i = 0; i < a.length; i++) {
+    if (a[i] != b[i]) return false;
+  }
+  return true;
+}
+
 //........................................................................
 
 godzi.Manipulator = function(map) {
@@ -203,6 +214,8 @@ godzi.EarthManipulator.prototype = osg.objectInehrit( godzi.Manipulator.prototyp
 
         if (ev.shiftKey)
             this.rotateModel(-deltaX, -deltaY);
+        else if (ev.ctrlKey)
+            this.zoomModel(0, -deltaY);
         else
             this.panModel(-deltaX, -deltaY);
 
@@ -521,19 +534,53 @@ godzi.MapView = function(elementId, size, map) {
     //catch (er) {
     //osg.log("exception in osgViewer " + er);
     //}
+    
+    this.frameEnd=[];
 };
 
 godzi.MapView.prototype = {
+
+    home: function() {
+        this.viewer.getManipulator().computeHomePosition();
+    },
+    
+    projectObjectIntoWindow: function(object) {
+        var viewMatrix = this.viewer.view.getViewMatrix();
+        var projectionMatrix = this.viewer.view.getProjectionMatrix();
+        var windowMatrix = null;
+        var vp = this.viewer.view.getViewport();
+        if (vp !== undefined) {
+        windowMatrix = vp.computeWindowMatrix();
+        }
+
+        var matrix = []; 
+        osg.Matrix.copy(windowMatrix, matrix);
+        osg.Matrix.preMult(matrix, projectionMatrix);
+        osg.Matrix.preMult(matrix, viewMatrix);
+
+        var result = osg.Matrix.transformVec3(matrix, object);
+        var height = this.viewer.canvas.height;
+        result[1] = height - result[1] - 1;
+        return result;
+    },
 
     run: function() {
         var that = this;
         var render = function() {
             window.requestAnimationFrame(render, this.canvas);
             that.viewer.frame();
-            if (that.onFrameEnd !== undefined && that.onFrameEnd != null)
-                that.onFrameEnd();
             that.map.frame();
+            if (that.frameEnd !== undefined && that.frameEnd != null) {
+            //Fire off any frame end callbacks
+                for (var i = 0; i < that.frameEnd.length; i++) {
+                  that.frameEnd[i]();
+                }
+            }
         };
         render();
+    },
+    
+    addFrameEndCallback: function(callback) {
+      this.frameEnd.push( callback );
     }
 };

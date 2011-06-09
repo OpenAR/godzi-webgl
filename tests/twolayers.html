@@ -74,11 +74,7 @@
 
 var map;
 var layerSwitcher;
-
-function toggleVisiblity() {
-  //map.imageLayers[1].setVisible(!map.imageLayers[1].getVisible());
-  map.imageLayers[1].setOpacity(0.2);
-}
+var mapView;
 
     godzi.init("../js/", function() {
 
@@ -101,10 +97,10 @@ function toggleVisiblity() {
         var size = godzi.getWindowSize();
         var headerHeight = jQuery('#header').height();
         size.h -= headerHeight;
-        var mapView = new godzi.MapView("3DView", size, map);
+        mapView = new godzi.MapView("3DView", size, map);
 
         // display the Lat/Long:
-        mapView.onFrameEnd = function() {
+        mapView.addFrameEndCallback( function() {
             var viewMatrix = mapView.viewer.view.getViewMatrix();
             viewMatrix = osg.Matrix.inverse(viewMatrix);
             var eye = [];
@@ -116,7 +112,7 @@ function toggleVisiblity() {
                 "Lat: " + lla[1].toFixed(2) + "\u00B0" + "  Long = " + lla[0].toFixed(2) + "\u00B0" + "<br/>" +
                 "Azim: " + osgearth.rad2deg(mapView.viewer.manipulator.localAzim).toFixed(1) + "\u00B0" +
                 "  Pitch:" + osgearth.rad2deg(mapView.viewer.manipulator.localPitch).toFixed(1) + "\u00B0");
-        }
+        });
         
         layerSwitcher = new godzi.controls.LayerSwitcher("LayerSwitcher", map);               
         jQuery("#LayerSwitcher").draggable();
@@ -135,6 +131,9 @@ function toggleVisiblity() {
         <a href="http://github.com/gwaldron/godzi-webgl">github</a> ::
         <a href="http://twitter.com/#!/pelicanmapping">twitter</a>
     </p>
+    <div id="toolbar">
+      <image src="../images/globe.gif" onclick="mapView.home();"/>
+    </div>
   </div>
   <div id="ViewContainer">
     <canvas id="3DView"></canvas>
@@ -145,12 +144,11 @@ function toggleVisiblity() {
       <li>wheel to zoom</li>
       <li>shift-drag to rotate</li>
       <li>space to reset</li>
-    </ul>
+    </ul>   
     
     <div id="LayerSwitcher" class="ui-widget-content">
     </div>
-    
-    <!--<button onclick="toggleVisiblity();">Toggle Visiblity</button>-->
+   
   </div>
  
   <div id="Coords">
