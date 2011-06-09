@@ -174,7 +174,7 @@ godzi.GeoRSSLayer.prototype = {
 		
 		for (var i in items)
 		{
-		    var icon = new godzi.Icon("icon" + i + "_" + items[i].guid, osgearth.deg2rad(items[i].longitude), osgearth.deg2rad(items[i].latitude), 0, this.iconUrl, {
+		    var icon = new godzi.Icon("icon" + i + "_" + items[i].guid, Math.deg2rad(items[i].longitude), Math.deg2rad(items[i].latitude), 0, this.iconUrl, {
               width: 32,
               height: 32,
 			  title: items[i].title
