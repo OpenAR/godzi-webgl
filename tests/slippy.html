@@ -55,6 +55,16 @@
 		padding: 2;
 		color: #000000;
 	}
+	
+	#InputSearch
+	{
+	    font-size: 0.75em;
+		color: #fff;
+		background-color: #000;
+		opacity: 0.6;
+		border: 1px solid #999;
+		padding: 1px 2px;
+	}
     
     a { color: #ffffff; }
     
@@ -89,7 +99,7 @@
         var size = godzi.getWindowSize();
         var headerHeight = jQuery('#header').height();
         size.h -= headerHeight;
-        var mapView = new godzi.MapView("3DView", size, map);
+        mapView = new godzi.MapView("3DView", size, map);
 
         // display the Lat/Long:
         mapView.addFrameEndCallback(function() {
