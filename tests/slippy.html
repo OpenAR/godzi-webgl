@@ -44,6 +44,17 @@
         padding: 2;
         color: Black;
     }
+
+    #Search
+    {
+	    float: right;
+		clear: both;
+		position: relative;
+		z-index: 10;
+		margin: 2;
+		padding: 2;
+		color: #000000;
+	}
     
     a { color: #ffffff; }
     
@@ -90,6 +101,11 @@
                 "Lat: " + lla[1].toFixed(2) + "\u00B0" + "  Long = " + lla[0].toFixed(2) + "\u00B0" + "<br/>" +
                 "X: " + xy[0].toFixed(1) + "  Y: " + xy[1].toFixed(1) + "<br/>");
         });
+
+        var placeSearch = new godzi.PlaceSearch("Search", "InputSearch", function(lat, lon, swlat, swlon, nelat, nelon) {
+            var range = ((.5 * (nelat - swlat)) / 0.267949849) * 111000.0;
+            mapView.viewer.manipulator.setViewpoint(lat, lon, 0.0, 0, -90, range);
+        });
     });
 
 </script>
@@ -115,6 +131,8 @@
     </ul>
   </div>
   <div id="Coords">
+  </div>
+  <div id="Search">
   </div>
 </body>
 
