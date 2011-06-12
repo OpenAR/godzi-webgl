@@ -145,7 +145,7 @@ godzi.Manipulator.prototype = {
             ratio = Math.accelerationInterp( ratio, -4.5 );
             var minDur = 2.0;
             var maxDur = Math.max(seconds, minDur);
-            this.setVPduration_ms = (minDur + ratio*(maxDir-minDir)) * 1000.0;
+            this.setVPduration_ms = (minDur + ratio*(maxDur-minDur)) * 1000.0;
         }
         else {
             this.setVPduration_ms = seconds * 1000.0;
