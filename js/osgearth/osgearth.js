@@ -410,11 +410,11 @@ osgearth.VirtualProgram.prototype = osg.objectInehrit(osg.Program.prototype, {
 
 Math.deg2rad = function(deg) {
     return deg * 0.0174532925;
-}
+};
 
 Math.rad2deg = function(rad) {
     return rad * 57.2957795;
-}
+};
 
 Math.clamp = function(x, min, max) {
     if (x < min)
@@ -423,7 +423,25 @@ Math.clamp = function(x, min, max) {
         return max;
     else
         return x;
-}
+};
+
+Math.log10 = function(n) {
+    return Math.log(n) / Math.LN10;  //Math.log(10);  //Math.LN10;
+};
+
+Math.powFast = function(x, y) {
+    return x / (x + y - y * x);
+};
+
+Math.smoothStepInterp = function(t) {
+    return (t * t) * (3.0 - 2.0 * t);
+};
+
+Math.accelerationInterp = function(t, a) {
+    return a == 0 ? t : a > 0 ? Math.powFast(t, a) : 1.0 - Math.powFast(1.0 - t, -a);
+};
+
+//........................................................................
 
 osgearth.url = function(url) {
   if (osgearth.proxy !== undefined && osgearth.proxy != null) {
@@ -946,7 +964,6 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
     resetSubtiles: function() {
         this.removeChildren();
         this.subtilesRequested = false;
-        this.numTexturesReady = 0;
     },
 
     build: function() {

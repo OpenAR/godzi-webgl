@@ -148,7 +148,7 @@
 		
 		var placeSearch = new godzi.PlaceSearch("Search", "InputSearch", function(lat, lon, swlat, swlon, nelat, nelon) {
 		  var range = ((.5 * (nelat - swlat)) / 0.267949849) * 111000.0;
-		  mapView.viewer.manipulator.setViewpoint(lat, lon, 0.0, 0, -90, range);
+		  mapView.viewer.manipulator.setViewpoint(lat, lon, 0.0, 0, -90, range, 3);
 		});
 		
 		//Add GeoRSSLayer
