@@ -1,0 +1,43 @@
+/* ------------------------------------------------------------------------- */
+/* Default styling for weather popups                                        */
+/* ------------------------------------------------------------------------- */
+
+.weather_popup {
+	color: #006;
+	font-size: 0.65em;
+	font-family: sans-serif;
+	padding: 4px;
+	text-align: top;
+}
+div.weather_popup {
+	width: 292px;
+}
+
+h4.weather_popup {
+	font-size: 1.1em;
+	font-weight: bold;
+}
+
+.weather_popup a:link {
+	color: #03f;
+}
+
+.weather_popup a:visited {
+	color: #03f;
+}
+
+div.weather_popup_background {
+	width: 300px;
+	padding: 4px;
+    border: 3px solid #fff;
+	border-radius: 15px;
+	background-image: url('../images/weather_back.gif');
+	opacity: 0.8;
+}
+
+div.weather_popup_image {
+	background-color: #fff;
+	border: 2px solid #666;
+	float: left;
+	margin: 4px 4px 4px 0px;
+}

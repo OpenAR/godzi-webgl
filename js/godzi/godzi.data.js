@@ -178,14 +178,28 @@ godzi.GeoRSSReader.prototype = {
 					}
 					
 					var link = $(this).find('link').eq(0).attr('href');
-					if (link == undefined || link == "")
-					  link = $(this).find('link').eq(0)[0].nextSibling.data;
+					try
+					{
+						if (link == undefined || link == "")
+						  link = $(this).find('link').eq(0)[0].nextSibling.data;
+					}
+					catch (e) { }
 					
+					var description = undefined;
+					try
+					{
+					    description = $(this).find('description').get(0).innerHTML;
+					}
+					catch(e) {}
+					
+					if (description == undefined || description == "")
+						description = $(this).find('description').text()
+						
 					items.push({ guid: $(this).find('guid').text(),
 					             title: $(this).find('title').text(),
 								 author: $(this).find('author').text(),
 								 pubDate: $(this).find('pubDate').text(),
-								 description: $(this).find('description').text(),
+								 description: description,
 								 link: link,
 								 latitude: lat,
 								 longitude: lon,

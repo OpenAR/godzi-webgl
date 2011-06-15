@@ -36,10 +36,10 @@
     
     #Coords
     {
-	    float: right;
+	    float: left;
         position: absolute;
 		bottom: 2px;
-		right: 2px;
+		left: 2px;
         z-index: 10;
         margin: 2;
         padding: 2;
@@ -74,14 +74,19 @@
 <meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
 
 <script type="text/javascript" src="../js/jquery/jquery-1.4.2.js"></script>
+<script type="text/javascript" src="../js/jquery/jquery-ui-1.8.2.custom.min.js"></script>
 <script type="text/javascript" src="../js/godzi.js"></script>
+<script type="text/javascript" src="../js/data/world_cities.js"></script>
+
+<link href="../css/ui-lightness/jquery.ui.all.css" rel="stylesheet" type="text/css"></link>
+<link href="../css/weather_popup.css" rel="stylesheet" type="text/css"></link>
 
 <script type="text/javascript">
 
     godzi.init("../js/", function() {
 
         // create a map model:
-        var map = new godzi.Map();
+        map = new godzi.Map();
 
         map.addImageLayer(new godzi.TMSImageLayer({
             name: "Landsat",
@@ -89,11 +94,11 @@
             tmsType: "google"
         }));
 
-        map.addImageLayer(new godzi.TMSImageLayer({
-            name: "OSM",
-            url: "http://readymap.org/readymap/tiles/1.0.0/35/",
-            tmsType: "google"
-        }));
+        //map.addImageLayer(new godzi.TMSImageLayer({
+        //    name: "OSM",
+        //    url: "http://readymap.org/readymap/tiles/1.0.0/35/",
+        //    tmsType: "google"
+        //}));
 
         // create a view tied to a page element:
         var size = godzi.getWindowSize();
@@ -102,7 +107,7 @@
         mapView = new godzi.MapView("3DView", size, map);
 
         // display the Lat/Long:
-        mapView.addFrameEndCallback( function() {
+        mapView.addFrameEndCallback(function() {
             var viewMatrix = mapView.viewer.view.getViewMatrix();
             viewMatrix = osg.Matrix.inverse(viewMatrix);
             var eye = [];
@@ -116,13 +121,14 @@
                 "  Pitch:" + Math.rad2deg(mapView.viewer.manipulator.localPitch).toFixed(1) + "\u00B0");
         });
 		
-		var placeSearch = new godzi.PlaceSearch("Search", "InputSearch", function(lat, lon, swlat, swlon, nelat, nelon, data) {
+		var placeSearch = new godzi.PlaceSearch("Search", "InputSearch", function(lat, lon, swlat, swlon, nelat, nelon) {
 		  var range = ((.5 * (nelat - swlat)) / 0.267949849) * 111000.0;
-		  if (range != 0)
-		      mapView.viewer.manipulator.setViewpoint(lat, lon, 0.0, 0, -90, range, 7);
-		  else
-		      alert('Error: ' + data);
+		  mapView.viewer.manipulator.setViewpoint(lat, lon, 0.0, 0, -90, range);
 		});
+		
+		//Add Weather Layer
+		var proxy = "http://demo.pelicanmapping.com/rmweb/proxy.php?url=";
+		var woeidLayer = new godzi.WOEIDWeatherLayer(mapView, world_cities, proxy);
     });
 
 </script>
