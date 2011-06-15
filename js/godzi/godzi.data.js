@@ -125,7 +125,6 @@ godzi.WMSImageLayer.prototype = osg.objectInehrit(osgearth.ImageLayer.prototype,
     createTexture: function(key, profile) {
         var imageURL = this.getURL(key, profile);
         return osg.Texture.create(imageURL);
-        //return osgearth.Texture.create(imageURL);
     }
 });
 

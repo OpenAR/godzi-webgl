@@ -819,59 +819,7 @@ osgearth.Map.prototype = {
         else
             return this.profile.toLLA(world);
     },
-
-    createNode: function() {
-        var node = new osg.Node();
-        var rootSize = this.profile.getTileCount(this.minLevel);
-        for (var x = 0; x < rootSize[0]; x++) {
-            for (var y = 0; y < rootSize[1]; y++) {
-                node.addChild(new osgearth.Tile([x, y, this.minLevel], this, null));
-            }
-        }
-
-        var stateSet = node.getOrCreateStateSet();
-
-        // set up our custom GLSL program
-        var vp = new osgearth.VirtualProgram();
-
-        vp.setShader(
-            "osgearth_vert_setupTexturing",
-            gl.VERTEX_SHADER,
-            osgearth.ShaderFactory.createVertexSetupTexturing(this.imageLayers));
-
-        vp.setShader(
-            "osgearth_frag_applyTexturing",
-            gl.FRAGMENT_SHADER,
-            osgearth.ShaderFactory.createFragmentApplyTexturing(this.imageLayers));
-
-
-        stateSet.setAttributeAndMode(vp, osg.StateAttribute.ON);
-
-        stateSet.setAttributeAndMode(new osg.CullFace('DISABLE'));
-
-        this.node = node;
-
-        for (var i = 0; i < this.imageLayers.length; i++) {
-
-            var visible = this.imageLayers[i].getVisible() ? true : false;
-            var visibleUniform = osg.Uniform.createInt1(visible, "Texture" + i + "Visible");
-            stateSet.addUniform(visibleUniform, osg.StateAttribute.ON);
-            this.imageLayers[i].visibleUniform = visibleUniform;
-
-            var opacity = this.imageLayers[i].getOpacity();
-            var opacityUniform = osg.Uniform.createFloat1(opacity, "Texture" + i + "Opacity");
-            this.imageLayers[i].opacityUniform = opacityUniform;
-            stateSet.addUniform(opacityUniform, osg.StateAttribute.ON);
-
-            var texMatUniform = osg.Uniform.createMatrix4(osg.Matrix.makeIdentity([]), "TexMat"+i );
-            stateSet.addUniform(texMatUniform, osg.StateAttribute.ON);
-
-            stateSet.addUniform(osg.Uniform.createInt1(i, "Texture" + i));
-        }
-
-        return node;
-    },
-
+    
     // called by Tile::traverse to tell the map that the tile is in use
     markTileDrawn: function(tile) {
         this.drawList[tile.key] = tile;
@@ -898,11 +846,92 @@ osgearth.Map.prototype = {
 
 //...................................................................
 
+osgearth.MapNode = function(map) {
+
+    osg.Node.call(this);
+    this.map = map;
+
+    var rootSize = map.profile.getTileCount(map.minLevel);
+    for (var x = 0; x < rootSize[0]; x++) {
+        for (var y = 0; y < rootSize[1]; y++) {
+            this.addChild(new osgearth.Tile([x, y, map.minLevel], map, null));
+        }
+    }
+
+    var stateSet = this.getOrCreateStateSet();
+
+    // set up our custom GLSL program
+    var vp = new osgearth.VirtualProgram();
+
+    vp.setShader(
+        "osgearth_vert_setupTexturing",
+        gl.VERTEX_SHADER,
+        osgearth.ShaderFactory.createVertexSetupTexturing(map.imageLayers));
+
+    vp.setShader(
+        "osgearth_frag_applyTexturing",
+        gl.FRAGMENT_SHADER,
+        osgearth.ShaderFactory.createFragmentApplyTexturing(map.imageLayers));
+
+
+    stateSet.setAttributeAndMode(vp, osg.StateAttribute.ON);
+
+    stateSet.setAttributeAndMode(new osg.CullFace('DISABLE'));
+
+    for (var i = 0; i < map.imageLayers.length; i++) {
+
+        var visible = map.imageLayers[i].getVisible() ? true : false;
+        var visibleUniform = osg.Uniform.createInt1(visible, "Texture" + i + "Visible");
+        stateSet.addUniform(visibleUniform, osg.StateAttribute.ON);
+        map.imageLayers[i].visibleUniform = visibleUniform;
+
+        var opacity = map.imageLayers[i].getOpacity();
+        var opacityUniform = osg.Uniform.createFloat1(opacity, "Texture" + i + "Opacity");
+        map.imageLayers[i].opacityUniform = opacityUniform;
+        stateSet.addUniform(opacityUniform, osg.StateAttribute.ON);
+
+        var texMatUniform = osg.Uniform.createMatrix4(osg.Matrix.makeIdentity([]), "TexMat" + i);
+        stateSet.addUniform(texMatUniform, osg.StateAttribute.ON);
+
+        stateSet.addUniform(osg.Uniform.createInt1(i, "Texture" + i));
+    }
+};
+
+osgearth.MapNode.prototype = osg.objectInehrit(osg.Node.prototype, {
+
+    traverse: function(visitor) {
+        if (visitor.modelviewMatrixStack !== undefined) { // i.e., in cull visitor
+            var lastViewMatrix = visitor.modelviewMatrixStack[visitor.modelviewMatrixStack.length - 1];
+            var mvmInv = [];
+            osg.Matrix.inverse(lastViewMatrix, mvmInv);
+            if ( visitor.eyePoint === undefined )
+                visitor.eyePoint = [];
+            osg.Matrix.getTrans(mvmInv, visitor.eyePoint);
+        }
+        var n = this.children.length;
+        for (var i = 0; i < n; i++) {
+            this.children[i].accept(visitor);
+        }
+    }
+});
+
+osgearth.MapNode.prototype.objectType = osg.objectType.generate("MapNode");
+
+osg.CullVisitor.prototype[osgearth.MapNode.prototype.objectType] = function(node) {
+    if (node.stateset)
+        this.pushStateSet(node.stateset);
+    this.traverse(node);
+    if (node.stateset)
+        this.popStateSet();
+};
+
+//...................................................................
+
 osgearth.Tile = function(key, map, parentTextures) {
 
     osg.Node.call(this);
 
-//    osg.log("Create tile: " + key);
+    //    osg.log("Create tile: " + key);
 
     this.key = key;
     this.map = map;
@@ -926,7 +955,7 @@ osgearth.Tile = function(key, map, parentTextures) {
 
     this.geometry = null;
     this.subtilesRequested = false;
-    this.subtileRange = 1e7;
+    this.subtileRange = 1e7 * 1e7;
     this.textures = [];
     this.textureReady = [];
     this.numTexturesReady = 0;
@@ -1076,7 +1105,7 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
             this.textures.push(newTex);
             this.textureReady.push(false);
 
-            if (parentTextures === null || this.map.waitForAllLayers ) {
+            if (parentTextures === null || this.map.waitForAllLayers) {
                 stateSet.setTextureAttributeAndMode(i, newTex);
             }
             else {
@@ -1099,7 +1128,8 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
         this.xform.setMatrix(tile2world);
         this.xform.addChild(this.geometry);
 
-        this.subtileRange = this.getBound().radius() * 3;
+        this.subtileRange2 = (this.getBound().radius() * 3);
+        this.subtileRange2 *= this.subtileRange2;
 
         // for geocentric maps, get the tile's deviation for geocentric normal-based culling
         if (this.map.geocentric && this.key[2] > 0) {
@@ -1134,9 +1164,9 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
 
         if (visitor.modelviewMatrixStack !== undefined) { // i.e., in cull visitor
 
-            var eye = this.getEyePoint(visitor);
+            var eye = visitor.eyePoint;  //this.getEyePoint(visitor);
 
-            var centerToEye = [];
+            var centerToEye = [0,0,0];
             osg.Vec3.sub(eye, this.centerWorld, centerToEye);
             osg.Vec3.normalize(centerToEye, centerToEye);
 
@@ -1146,12 +1176,12 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
                 this.map.markTileDrawn(this);
 
                 var bound = this.getBound();
-                var range = osg.Vec3.length(osg.Vec3.sub(eye, bound.center(), []));
+                var range2 = osg.Vec3.length2(osg.Vec3.sub(eye, bound.center(), []));
 
                 var traverseChildren = true;
                 var numChildren = this.children.length;
 
-                if (range > this.subtileRange || this.key[2] >= this.map.maxLevel) {
+                if (range2 > this.subtileRange2 || this.key[2] >= this.map.maxLevel) {
                     traverseChildren = false;
                 }
                 else {

@@ -595,7 +595,7 @@ godzi.MapView = function(elementId, size, map) {
         this.viewer.setupManipulator(new godzi.EarthManipulator(map));
     else
         this.viewer.setupManipulator(new godzi.MapManipulator(map));
-    this.viewer.setScene(map.createNode());
+    this.viewer.setScene( new osgearth.MapNode(map) ); //map.createNode());
     delete this.viewer.view.light;
     this.viewer.getManipulator().computeHomePosition();
     //this.viewer.run();
