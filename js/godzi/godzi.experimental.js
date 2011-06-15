@@ -327,7 +327,7 @@ godzi.PositionEngine.prototype = {
 	mapView._inverseViewMatrix = osg.Matrix.inverse( viewMatrix );                        
 
 	for (var i = 0; i < this.elements.length; i++) {
-	  if (viewChanged || this.elements[i].dirty) {
+	  if (viewChanged || this.elements[i]._dirty) {
 		this.elements[i].update(this.mapView);
 	  }
 	}
