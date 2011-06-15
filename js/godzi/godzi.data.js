@@ -66,7 +66,6 @@ godzi.ArcGISImageLayer.prototype = osg.objectInehrit(osgearth.ImageLayer.prototy
 
     createTexture: function(key, profile) {
         var imageURL = this.getURL(key, profile);
-//        osg.log( "URL = " + imageURL );
         return osg.Texture.create(imageURL);
     }
 });
