@@ -140,23 +140,10 @@ godzi.PositionedElement.prototype = {
         this._dirty = false;
         this.ecf = ecf;
       }
-      
-      //Cull elements on the other side of the earth.
-      var viewMatrix = mapView.viewer.view.getViewMatrix();
-      
-      if (this._lastViewMatrix !== undefined) {
-        if (osg.Matrix.equals(viewMatrix, this._lastViewMatrix)) {
-          return;
-        }
-      }
-      
-      //Save the last view matrix
-      this._lastViewMatrix = [];
-      osg.Matrix.copy(viewMatrix, this._lastViewMatrix);
-                        
+	                    
       //Cluster cull geocentric
       if (mapView.map.geocentric) {
-          viewMatrix = osg.Matrix.inverse(viewMatrix);
+          viewMatrix = mapView._inverseViewMatrix;
           var eye = [];      
           osg.Matrix.getTrans(viewMatrix, eye);
                     
@@ -323,9 +310,27 @@ godzi.PositionEngine.prototype = {
   },
   
   frameEnd: function() {
-    for (var i = 0; i < this.elements.length; i++) {
-      this.elements[i].update(this.mapView);
+  
+    //Cull elements on the other side of the earth.
+    var viewMatrix = mapView.viewer.view.getViewMatrix();
+      
+	var viewChanged = true;
+    if (this._lastViewMatrix !== undefined) {
+      viewChanged = !osg.Matrix.equals(viewMatrix, this._lastViewMatrix);
     }
+	else {
+	  this._lastViewMatrix = [];
+	}
+      
+      //Save the last view matrix
+	osg.Matrix.copy(viewMatrix, this._lastViewMatrix);
+	mapView._inverseViewMatrix = osg.Matrix.inverse( viewMatrix );                        
+
+	for (var i = 0; i < this.elements.length; i++) {
+	  if (viewChanged || this.elements[i].dirty) {
+		this.elements[i].update(this.mapView);
+	  }
+	}
   }
 }
 

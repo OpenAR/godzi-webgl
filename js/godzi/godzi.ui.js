@@ -32,6 +32,10 @@ godzi.Manipulator = function(map) {
     this.maxDistance = 1e10;
     this.buttonup = true;
     this.rotation = osg.Quat.makeIdentity();
+    this.localAzim = 0;
+    this.localPitch = Math.deg2rad(-90);
+    this.settingVP = false;
+    
 };
 
 godzi.Manipulator.prototype = {
@@ -78,6 +82,117 @@ godzi.Manipulator.prototype = {
         else if (this.distance > this.maxDistance)
             this.distance = this.maxDistance;
     },
+    
+    getViewpoint: function() {
+        var vp = {};
+        vp.center = osg.Vec3.copy(this.center, []);
+        vp.heading = Math.rad2deg(this.localAzim);
+        vp.pitch = Math.rad2deg(this.localPitch);
+        vp.range = this.distance;
+        return vp;
+    },
+    
+    startViewpointTransition: function(lat,lon,alt,heading,pitch,range,seconds) {
+
+        var newCenter = this.map.lla2world( [Math.deg2rad(lon), Math.deg2rad(lat), alt] );
+        
+        this.startVP = this.getViewpoint();
+        this.deltaHeading = heading - this.startVP.heading;
+        this.deltaPitch = pitch - this.startVP.pitch;
+        this.deltaRange = range - this.startVP.range;
+        this.deltaCenter = osg.Vec3.sub( newCenter, this.startVP.center, [] );
+        
+        while( this.deltaHeading > 180 ) this.deltaHeading -= 360;
+        while( this.deltaHeading < -180 ) this.deltaHeading += 360;
+        
+        var h0 = this.startVP.range * Math.sin( Math.deg2rad(-this.startVP.pitch));
+        var h1 = range * Math.sin( Math.deg2rad(-pitch));
+        var dh = h1-h0;
+        
+        var de;
+        if ( this.map.geocentric ) {
+            var startFP = this.startVP.center;
+            var xyz0 = [this.startVP.center[0], this.startVP.center[1], 0];
+            var xyz1 = this.map.lla2world( [Math.deg2rad(lon), Math.deg2rad(lat), 0] );
+            de = osg.Vec3.length( osg.Vec3.sub(xyz0, xyz1, []) );
+        }
+        else {
+            de = osg.Vec3.length(this.deltaCenter);
+        }    
+        
+        this.arcHeight = Math.max( de-Math.abs(dh), 0 );
+        if ( this.arcHeight > 0 ) {
+            var h_apex = 2*(h0+h1) + this.arcHeight;
+            var dh2_up = Math.abs(h_apex - h0)/100000.0;
+            this.setVPaccel = Math.log10(dh2_up);
+            var dh2_down = Math.abs(h_apex - h1)/100000.0;
+            this.setVPaccel2 = -Math.log10(dh2_down);                            
+        }
+        else { 
+            var dh2 = (h1-h0)/100000.0;
+            this.setVPaccel = Math.abs(dh2) <= 1.0? 0.0 : dh2 > 0.0? Math.log10(dh2) : -Math.log10(-dh2);
+            if ( Math.abs( this.setVPaccel ) < 1.0 )
+                this.setVPaccel = 0.0;
+        }
+        
+        this.setVPstartTime_ms = new Date().getTime();
+        
+        //TODO: auto viewpoint duration code (from osgEarth)
+        // auto time:
+        if ( this.map.geocentric ) {
+            var maxDistance = this.map.profile.ellipsoid.radiusEquator;
+            var ratio = Math.clamp( de/maxDistance, 0, 1 );
+            ratio = Math.accelerationInterp( ratio, -4.5 );
+            var minDur = 2.0;
+            var maxDur = Math.max(seconds, minDur);
+            this.setVPduration_ms = (minDur + ratio*(maxDur-minDur)) * 1000.0;
+        }
+        else {
+            this.setVPduration_ms = seconds * 1000.0;
+        }
+        
+        this.settingVP = true;
+    },
+    
+    updateSetViewpoint: function() {
+        var now = new Date().getTime();
+        var t = (now - this.setVPstartTime_ms)/this.setVPduration_ms;
+        var tp = t;
+        
+        if ( t >= 1.0 ) {
+            t = 1.0;
+            tp = 1.0;
+            this.settingVP = false;
+        }
+        else if ( this.arcHeight > 0.0 ) {
+            if ( tp <= 0.5 ) {
+                var t2 = 2.0*tp;
+                t2 = Math.accelerationInterp( t2, this.setVPaccel );
+                tp = 0.5*t2;
+            }
+            else {
+                var t2 = 2.0*(tp-0.5);
+                t2 = Math.accelerationInterp( t2, this.setVPaccel2 );
+                tp = 0.5+(0.5*t2);
+            }
+            tp = Math.smoothStepInterp( tp );
+            //tp = Math.smoothStepInterp( tp );
+        }
+        else if ( t > 0.0 ) {
+            tp = Math.accelerationInterp( tp, this.setVPaccel );
+            tp = Math.smoothStepInterp( tp );
+        }
+        
+        var lla = this.map.world2lla( osg.Vec3.add( this.startVP.center, osg.Vec3.mult( this.deltaCenter, tp, [] ), [] ) );
+        
+        this.setViewpoint(
+            Math.rad2deg( lla[1] ),
+            Math.rad2deg( lla[0] ),
+            lla[2],
+            this.startVP.heading + this.deltaHeading * tp,
+            this.startVP.pitch + this.deltaPitch * tp,
+            this.startVP.range + this.deltaRange * tp + (Math.sin(Math.PI*tp)*this.arcHeight) );
+    }
 };
 
 //........................................................................
@@ -89,6 +204,7 @@ godzi.EarthManipulator = function(map) {
     this.buttonup = true;
     this.centerRotation = osg.Quat.makeIdentity();
     this.lockAzimWhilePanning = true;
+    this.settingVP = false;
     this.computeHomePosition();
 }
 
@@ -317,28 +433,42 @@ godzi.EarthManipulator.prototype = osg.objectInehrit( godzi.Manipulator.prototyp
         return osg.Matrix.makeLookAt(osg.Vec3.sub(point, osg.Vec3.mult(look, offset, []), []), point, up);
     },
 
-    setViewpoint: function(lat, lon, alt, heading, pitch, range) {
+    setViewpoint: function(lat, lon, alt, heading, pitch, range, seconds) {
+    
         var lla = [Math.deg2rad(lon), Math.deg2rad(lat), alt];
-        this.center = this.map.profile.ellipsoid.lla2ecef(lla);
+            
+        if ( seconds === undefined ) {
+            this.center = this.map.lla2world(lla);
 
-        var newPitch = Math.clamp(Math.deg2rad(pitch), this.minPitch, this.maxPitch);
-        var newAzim = this.normalizeAzimRad(Math.deg2rad(heading));
+            var newPitch = Math.clamp(Math.deg2rad(pitch), this.minPitch, this.maxPitch);
+            var newAzim = this.normalizeAzimRad(Math.deg2rad(heading));
 
-        this.setDistance(range);
+            this.setDistance(range);
 
-        var localFrame = this.getCoordFrame(this.center);
-        this.centerRotation = osg.Matrix.getRotate(localFrame);
+            var localFrame = this.getCoordFrame(this.center);
+            this.centerRotation = osg.Matrix.getRotate(localFrame);
 
-        var azim_q = osg.Quat.makeRotate(newAzim, 0, 0, 1);
-        var pitch_q = osg.Quat.makeRotate(-newPitch - (Math.PI / 2.0), 1, 0, 0);
-        var newRot_m = osg.Matrix.makeRotateFromQuat(osg.Quat.multiply(azim_q, pitch_q));
-        this.rotation = osg.Matrix.getRotate(osg.Matrix.inverse(newRot_m));
+            var azim_q = osg.Quat.makeRotate(newAzim, 0, 0, 1);
+            var pitch_q = osg.Quat.makeRotate(-newPitch - (Math.PI / 2.0), 1, 0, 0);
+            var newRot_m = osg.Matrix.makeRotateFromQuat(osg.Quat.multiply(azim_q, pitch_q));
+            this.rotation = osg.Matrix.getRotate(osg.Matrix.inverse(newRot_m));
 
-        this.localPitch = newPitch;
-        this.localAzim = newAzim;
+            this.localPitch = newPitch;
+            this.localAzim = newAzim;
 
-        this.recalcLocalPitchAndAzim();
-        this.recalculateCenter(localFrame);
+            this.recalcLocalPitchAndAzim();
+            this.recalculateCenter(localFrame);
+        }
+        else {
+            this.startViewpointTransition(lat,lon,alt,heading,pitch,range,seconds);            
+            this.recalculateCenter(this.getCoordFrame(this.center));
+        }
+    },
+    
+    frame: function() {
+        if ( this.settingVP ) {
+            this.updateSetViewpoint();
+        }        
     },
 
     getMatrix: function() {
@@ -350,6 +480,7 @@ godzi.EarthManipulator.prototype = osg.objectInehrit( godzi.Manipulator.prototyp
     },
 
     getInverseMatrix: function() {
+        this.frame();
         var m = osg.Matrix.makeTranslate(-this.center[0], -this.center[1], -this.center[2]);
         osg.Matrix.postMult(osg.Matrix.makeRotateFromQuat(osg.Quat.inverse(this.centerRotation)), m);
         osg.Matrix.postMult(osg.Matrix.makeRotateFromQuat(osg.Quat.inverse(this.rotation)), m);
@@ -373,10 +504,15 @@ godzi.MapManipulator.prototype = osg.objectInehrit(godzi.Manipulator.prototype, 
         this.maxDistance = this.distance * 1.5;        
     },
     
-    setViewpoint: function(lat, lon, alt, heading, pitch, range) {
-        var lla = [Math.deg2rad(lon), Math.deg2rad(lat), alt];
-        this.center = this.map.lla2world(lla);
-        this.setDistance(range);
+    setViewpoint: function(lat, lon, alt, heading, pitch, range, seconds) {
+        if ( seconds === undefined || seconds == 0 ) {
+            var lla = [Math.deg2rad(lon), Math.deg2rad(lat), alt];
+            this.center = this.map.lla2world(lla);
+            this.setDistance(range);
+        }
+        else {
+            this.startViewpointTransition(lat, lon, alt, heading, pitch, range, seconds );
+        }
     },
     
     panModel: function(dx, dy) {
@@ -393,8 +529,15 @@ godzi.MapManipulator.prototype = osg.objectInehrit(godzi.Manipulator.prototype, 
         else
             this.setDistance(this.minDistance);
     },
+    
+    frame: function() {
+        if ( this.settingVP ) {
+            this.updateSetViewpoint();
+        }
+    },
 
     getInverseMatrix: function() {
+        this.frame();
         var eye = [];
         osg.Vec3.copy( this.center, eye );
         eye[2] = this.distance;

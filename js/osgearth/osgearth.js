@@ -100,6 +100,15 @@ osg.Quat.rotateVecOnToVec = function(from, to, r) {
     return r;
 };
 
+osg.StateSet.removeUniform = function(stateSet, name) {
+    delete stateSet.uniforms[name];
+    var index = stateSet.uniforms.uniformKeys.indexOf(name);
+    if (index !== -1) {
+        delete stateSet.uniforms.uniformKeys[index];
+        stateSet.uniforms.uniformKeys.splice(index, 1);
+    }
+};
+
 //........................................................................
 
 osgearth.FunctionLocation = {
@@ -401,11 +410,11 @@ osgearth.VirtualProgram.prototype = osg.objectInehrit(osg.Program.prototype, {
 
 Math.deg2rad = function(deg) {
     return deg * 0.0174532925;
-}
+};
 
 Math.rad2deg = function(rad) {
     return rad * 57.2957795;
-}
+};
 
 Math.clamp = function(x, min, max) {
     if (x < min)
@@ -414,7 +423,25 @@ Math.clamp = function(x, min, max) {
         return max;
     else
         return x;
-}
+};
+
+Math.log10 = function(n) {
+    return Math.log(n) / Math.LN10;  //Math.log(10);  //Math.LN10;
+};
+
+Math.powFast = function(x, y) {
+    return x / (x + y - y * x);
+};
+
+Math.smoothStepInterp = function(t) {
+    return (t * t) * (3.0 - 2.0 * t);
+};
+
+Math.accelerationInterp = function(t, a) {
+    return a == 0 ? t : a > 0 ? Math.powFast(t, a) : 1.0 - Math.powFast(1.0 - t, -a);
+};
+
+//........................................................................
 
 osgearth.url = function(url) {
   if (osgearth.proxy !== undefined && osgearth.proxy != null) {
@@ -684,6 +711,7 @@ osgearth.ImageLayer = function(name) {
     this.profile = undefined;
     this.opacity = 1.0;
     this.visible = true;
+    this.draw = false; // internal
 };
 
 osgearth.ImageLayer.prototype = {
@@ -691,32 +719,33 @@ osgearth.ImageLayer.prototype = {
     name: function() {
         return this.name;
     },
-    
+
     getOpacity: function() {
         return this.opacity;
     },
-    
+
     setOpacity: function(opacity) {
         if (this.opacity != opacity) {
-          this.opacity = opacity;
-          if (this.opacityUniform !== undefined ) {
-           this.opacityUniform.set( [this.opacity] );
-         }
+            this.opacity = opacity;
+            if (this.opacityUniform !== undefined) {
+                this.opacityUniform.set([this.opacity]);
+            }
         }
     },
-    
+
     getVisible: function() {
-      return this.visible;
+        return this.visible;
     },
-    
-    setVisible: function( visible ) {
-      if (this.visible != visible) {
-         this.visible = visible;
-         if (this.visibleUniform !== undefined ) {
-           this.visibleUniform.set( [this.visible] );
-         }
-      }
-    }        
+
+    setVisible: function(visible) {
+        if (this.visible != visible) {
+            this.visible = visible;
+            if (this.visibleUniform !== undefined) {
+                this.visibleUniform.set([this.visible]);
+            }
+        }
+    }
+
 };
 
 //...................................................................
@@ -761,6 +790,8 @@ osgearth.Map = function(args) {
 
     // don't subdivide beyond this level
     this.maxLevel = 22;
+
+    this.waitForAllLayers = true;
 };
 
 osgearth.Map.prototype = {
@@ -795,7 +826,7 @@ osgearth.Map.prototype = {
                 node.addChild(new osgearth.Tile([x, y, 0], this, null));
             }
         }
-        
+
         var stateSet = node.getOrCreateStateSet();
 
         // set up our custom GLSL program
@@ -822,18 +853,17 @@ osgearth.Map.prototype = {
 
             var visible = this.imageLayers[i].getVisible() ? true : false;
             var visibleUniform = osg.Uniform.createInt1(visible, "Texture" + i + "Visible");
-            stateSet.addUniform(visibleUniform, osg.StateAttribute.ON | osg.StateAttribute.OVERRIDE);
+            stateSet.addUniform(visibleUniform, osg.StateAttribute.ON); // | osg.StateAttribute.OVERRIDE);
             this.imageLayers[i].visibleUniform = visibleUniform;
 
             var opacity = this.imageLayers[i].getOpacity();
             var opacityUniform = osg.Uniform.createFloat1(opacity, "Texture" + i + "Opacity");
-            stateSet.addUniform(opacityUniform, osg.StateAttribute.ON | osg.StateAttribute.OVERRIDE);
             this.imageLayers[i].opacityUniform = opacityUniform;
-            stateSet.addUniform(opacityUniform, osg.StateAttribute.ON | osg.StateAttribute.OVERRIDE);
+            stateSet.addUniform(opacityUniform, osg.StateAttribute.ON); // | osg.StateAttribute.OVERRIDE);
 
             stateSet.addUniform(osg.Uniform.createInt1(i, "Texture" + i));
         }
-        
+
         return node;
     },
 
@@ -891,6 +921,9 @@ osgearth.Tile = function(key, map) {
     this.subtilesRequested = false;
     this.subtileRange = 1e7;
     this.textures = [];
+    this.textureReady = [];
+    this.numTexturesReady = 0;
+    //this.layerVisibleUniforms = [];
 
     this.build();
 };
@@ -908,12 +941,24 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
     },
 
     allTexturesReady: function() {
+        return this.numTexturesReady === this.textures.length;
+    },
+
+    // checks to see whether all the images for this tile are available
+    checkTextures: function() {
+        this.numTexturesReady = 0;
         for (var i = 0; i < this.textures.length; i++) {
-            if (!this.textures[i].isImageReady()) {
-                return false;
+            if (this.textureReady[i] === true) {
+                this.numTexturesReady++;
+            }
+            else if (this.textures[i].isImageReady()) {
+                this.textureReady[i] = true;
+                // in no-wait mode, remove the uniform that hides a not-yet-ready layer
+                if (!this.map.waitForAllLayers)
+                    osg.StateSet.removeUniform(this.geometry.getStateSet(), "Texture" + i + "Visible");
+                this.numTexturesReady++;
             }
         }
-        return true;
     },
 
     resetSubtiles: function() {
@@ -1013,13 +1058,24 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
         //var tris = new osg.DrawElements(gl.LINE_STRIP, osg.BufferArray.create(gl.ELEMENT_ARRAY_BUFFER, elements, 1));
         this.geometry.getPrimitives().push(tris);
 
-        // the textures:        
+        // the textures:     
+        var stateSet = this.geometry.getOrCreateStateSet();
+
         for (var i = 0, n = this.map.imageLayers.length; i < n; i++) {
             var layer = this.map.imageLayers[i];
             var tex = layer.createTexture(this.key, this.map.profile);
             this.textures.push(tex);
-            this.geometry.getOrCreateStateSet().setTextureAttributeAndMode(i, tex);
+            this.textureReady.push(false);
+            stateSet.setTextureAttributeAndMode(i, tex);
             eval("this.geometry.getAttributes().TexCoord" + i + " = osg.BufferArray.create(gl.ARRAY_BUFFER, texcoords0, 2);");
+
+            // in no-wait mode, install a temporary uniform that will override the layer
+            // uniform. This will hide the layer image until it is fully loaded. The uniform
+            // is later removed in checkTextures()
+            if (!this.map.waitForAllLayers && i > 0) {
+                var visible = osg.Uniform.createInt1(0, "Texture" + i + "Visible");
+                stateSet.addUniform(visible, osg.StateAttribute.ON);
+            }
         }
 
         this.xform = new osg.MatrixTransform();
@@ -1028,7 +1084,7 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
 
         this.subtileRange = this.getBound().radius() * 3;
 
-        // now determine the tile's deviation for geocentric normal-based culling
+        // for geocentric maps, get the tile's deviation for geocentric normal-based culling
         if (this.map.geocentric && this.key[2] > 0) {
             for (var i = 0; i < 4; i++) {
                 var vec = [];
@@ -1043,19 +1099,9 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
     },
 
     requestSubtiles: function() {
-        var parent = this;
-
-        parent.loadSubtile(0);
-        parent.loadSubtile(1);
-        parent.loadSubtile(2);
-        parent.loadSubtile(3);
-
+        for (var q = 0; q < 4; q++)
+            this.addChild(new osgearth.Tile(osgearth.TileKey.child(this.key, q), this.map));
         this.subtilesRequested = true;
-    },
-
-    loadSubtile: function(quadrant) {
-        var tile = new osgearth.Tile(osgearth.TileKey.child(this.key, quadrant), this.map);
-        this.addChild(tile);
     },
 
     getEyePoint: function(visitor) {
@@ -1100,16 +1146,23 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
                         traverseChildren = false;
                     }
                     else {
-                        //Check to see if the images are ready
-                        var allImagesReady = true;
-                        for (var i = 0; i < this.children.length; i++) {
-                            if (!this.children[i].allTexturesReady()) {
-                                allImagesReady = false;
-                                break;
+                        if (this.map.waitForAllLayers) {
+                            for (var i = 0; i < this.children.length; i++) {
+                                var child = this.children[i];
+                                if (!child.allTexturesReady()) {
+                                    traverseChildren = false;
+                                    child.checkTextures();
+                                }
                             }
                         }
-                        if (!allImagesReady) {
-                            traverseChildren = false;
+                        else {
+                            for (var i = 0; i < this.children.length; i++) {
+                                var child = this.children[i];
+                                if (!child.textureReady[0])
+                                    traverseChildren = false;
+                                if (!child.allTexturesReady())
+                                    child.checkTextures();
+                            }
                         }
                     }
                 }

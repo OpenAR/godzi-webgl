@@ -44,6 +44,27 @@
         padding: 2;
         color: Black;
     }
+
+    #Search
+    {
+	    float: right;
+		clear: both;
+		position: relative;
+		z-index: 10;
+		margin: 2;
+		padding: 2;
+		color: #000000;
+	}
+	
+	#InputSearch
+	{
+	    font-size: 0.75em;
+		color: #fff;
+		background-color: #000;
+		opacity: 0.6;
+		border: 1px solid #999;
+		padding: 1px 2px;
+	}
     
     a { color: #ffffff; }
     
@@ -78,7 +99,7 @@
         var size = godzi.getWindowSize();
         var headerHeight = jQuery('#header').height();
         size.h -= headerHeight;
-        var mapView = new godzi.MapView("3DView", size, map);
+        mapView = new godzi.MapView("3DView", size, map);
 
         // display the Lat/Long:
         mapView.addFrameEndCallback(function() {
@@ -89,6 +110,11 @@
             jQuery("#Coords").html(
                 "Lat: " + lla[1].toFixed(2) + "\u00B0" + "  Long = " + lla[0].toFixed(2) + "\u00B0" + "<br/>" +
                 "X: " + xy[0].toFixed(1) + "  Y: " + xy[1].toFixed(1) + "<br/>");
+        });
+
+        var placeSearch = new godzi.PlaceSearch("Search", "InputSearch", function(lat, lon, swlat, swlon, nelat, nelon) {
+            var range = ((.5 * (nelat - swlat)) / 0.267949849) * 111000.0;
+            mapView.viewer.manipulator.setViewpoint(lat, lon, 0.0, 0, -90, range, 5);
         });
     });
 
@@ -115,6 +141,8 @@
     </ul>
   </div>
   <div id="Coords">
+  </div>
+  <div id="Search">
   </div>
 </body>
 

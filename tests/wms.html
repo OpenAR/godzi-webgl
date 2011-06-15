@@ -36,34 +36,12 @@
     
     #Coords
     {
-	    float: right;
-        position: absolute;
-		bottom: 2px;
-		right: 2px;
+        float: right;
+        position: relative;
         z-index: 10;
         margin: 2;
         padding: 2;
     }
-
-    #Search
-    {
-	    float: right;
-		clear: both;
-		position: relative;
-		z-index: 10;
-		margin: 2;
-		padding: 2;
-	}
-	
-	#InputSearch
-	{
-	    font-size: 0.75em;
-		color: #fff;
-		background-color: #000;
-		opacity: 0.6;
-		border: 1px solid #999;
-		padding: 1px 2px;
-	}
     
     a { color: #ffffff; }
     
@@ -72,7 +50,6 @@
 <title>Godzi WebGL</title>
 
 <meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
-
 <script type="text/javascript" src="../js/jquery/jquery-1.4.2.js"></script>
 <script type="text/javascript" src="../js/godzi.js"></script>
 
@@ -83,23 +60,18 @@
         // create a map model:
         var map = new godzi.Map();
 
-        map.addImageLayer(new godzi.TMSImageLayer({
-            name: "Landsat",
-            url: "http://readymap.org/readymap/tiles/1.0.0/22/",
-            tmsType: "google"
-        }));
-
-        map.addImageLayer(new godzi.TMSImageLayer({
-            name: "OSM",
-            url: "http://readymap.org/readymap/tiles/1.0.0/35/",
-            tmsType: "google"
+        map.addImageLayer(new godzi.WMSImageLayer({
+            name: "Basic",
+            url: "http://labs.metacarta.com/wms-c/Basic.py",			
+			layers: "basic",
+			format: "image/png"            
         }));
 
         // create a view tied to a page element:
         var size = godzi.getWindowSize();
         var headerHeight = jQuery('#header').height();
         size.h -= headerHeight;
-        mapView = new godzi.MapView("3DView", size, map);
+        var mapView = new godzi.MapView("3DView", size, map);
 
         // display the Lat/Long:
         mapView.addFrameEndCallback( function() {
@@ -115,14 +87,6 @@
                 "Azim: " + Math.rad2deg(mapView.viewer.manipulator.localAzim).toFixed(1) + "\u00B0" +
                 "  Pitch:" + Math.rad2deg(mapView.viewer.manipulator.localPitch).toFixed(1) + "\u00B0");
         });
-		
-		var placeSearch = new godzi.PlaceSearch("Search", "InputSearch", function(lat, lon, swlat, swlon, nelat, nelon, data) {
-		  var range = ((.5 * (nelat - swlat)) / 0.267949849) * 111000.0;
-		  if (range != 0)
-		      mapView.viewer.manipulator.setViewpoint(lat, lon, 0.0, 0, -90, range, 7);
-		  else
-		      alert('Error: ' + data);
-		});
     });
 
 </script>
@@ -148,8 +112,6 @@
       <li>shift-drag to rotate</li>
       <li>space to reset</li>
     </ul>
-  </div>
-  <div id="Search">
   </div>
   <div id="Coords">
   </div>
