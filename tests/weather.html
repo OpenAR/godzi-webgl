@@ -59,9 +59,9 @@
 
         // create a map model:
         var map = new godzi.Map();
+        map.waitForAllLayers = false;
 
-		
-		map.addImageLayer(new godzi.TMSImageLayer({
+        map.addImageLayer(new godzi.TMSImageLayer({
             name: "Landsat",
             url: "http://readymap.org/readymap/tiles/1.0.0/22/",
             tmsType: "google"
@@ -72,13 +72,13 @@
             url: "http://readymap.org/readymap/tiles/1.0.0/35/",
             tmsType: "google"
         }));
-		
+
         map.addImageLayer(new godzi.WMSImageLayer({
             name: "Basic",
-            url: "http://gis.srh.noaa.gov/arcgis/services/RIDGERadar/MapServer/WMSServer",			
-			layers: "0",
-			format: "image/png",
-            args: "TRANSPARENT=TRUE"			
+            url: "http://gis.srh.noaa.gov/arcgis/services/RIDGERadar/MapServer/WMSServer",
+            layers: "0",
+            format: "image/png",
+            args: "TRANSPARENT=TRUE"
         }));
 
         // create a view tied to a page element:
@@ -88,7 +88,7 @@
         var mapView = new godzi.MapView("3DView", size, map);
 
         // display the Lat/Long:
-        mapView.addFrameEndCallback( function() {
+        mapView.addFrameEndCallback(function() {
             var viewMatrix = mapView.viewer.view.getViewMatrix();
             viewMatrix = osg.Matrix.inverse(viewMatrix);
             var eye = [];

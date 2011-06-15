@@ -110,7 +110,7 @@ godzi.controls.GeoRSSList.prototype = {
 	  }
 		
 	  $(itemDiv).click(function(){
-	      mapView.viewer.manipulator.setViewpoint(value.latitude, value.longitude, 0.0, 0, -90, 2000000);
+	      mapView.viewer.manipulator.setViewpoint(value.latitude, value.longitude, 0.0, 0, -90, 2000000, 1);
 	  });
 	  
 	  element.append(itemDiv);

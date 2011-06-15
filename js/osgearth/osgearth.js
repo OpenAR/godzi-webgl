@@ -185,13 +185,14 @@ osgearth.ShaderFactory.createVertexSetupTexturing = function(imageLayers) {
     
     for( var unit=0; unit<imageLayers.length; unit++ ) {
         buf += "attribute vec2 TexCoord" + unit + ";\n";
+        buf += "uniform mat4 TexMat" + unit + ";\n"
         buf += "varying vec2 FragTexCoord" + unit + ";\n";
     }
     
     buf += "void osgearth_vert_setupTexturing(void) { \n";
     
     for (var unit = 0; unit < imageLayers.length; unit++) {
-        buf += "    FragTexCoord" + unit + " = TexCoord" + unit + ";\n";
+        buf += "    FragTexCoord" + unit + " = (TexMat" + unit + " * vec4(TexCoord" + unit + ",0,1)).xy;\n";
     }
     buf += "}\n";
     
@@ -426,7 +427,7 @@ Math.clamp = function(x, min, max) {
 };
 
 Math.log10 = function(n) {
-    return Math.log(n) / Math.LN10;  //Math.log(10);  //Math.LN10;
+    return Math.log(n) / Math.LN10;
 };
 
 Math.powFast = function(x, y) {
@@ -465,14 +466,11 @@ osgearth.Extent = {
     },
     clamp: function(extent, vec2) {
         vec2[0] = Math.clamp( vec2[0], extent.xmin, extent.xmax );
-        vec2[1] = Math.clamp(vec2[1], extent.ymin, extent.ymax);
+        vec2[1] = Math.clamp( vec2[1], extent.ymin, extent.ymax);
     }
 };
 
 //...................................................................
-
-osgearth.MERC_MAX_DEG = 85.084059050110383;
-osgearth.MERC_MAX_RAD = 1.48499697;
 
 osgearth.EllipsoidModel = function() {
     this.setRadii(6378137.0, 6356752.3142); // WGS84
@@ -679,7 +677,7 @@ osgearth.TileKey = {
         }
         return [x, y, key[2] + 1];
     },
-
+    
     getExtent: function(key, profile) {
         var size = profile.getTileSize(key[2]);
         var xmin = profile.extent.xmin + (size[0] * key[0]);
@@ -788,6 +786,9 @@ osgearth.Map = function(args) {
     // you can monitor this value to see how many tiles are being drawn each frame.
     this.drawListSize = 0;
 
+    // start at this level
+    this.minLevel = 2;
+
     // don't subdivide beyond this level
     this.maxLevel = 22;
 
@@ -821,9 +822,10 @@ osgearth.Map.prototype = {
 
     createNode: function() {
         var node = new osg.Node();
-        for (var x = 0; x < this.profile.baseTilesX; x++) {
-            for (var y = 0; y < this.profile.baseTilesY; y++) {
-                node.addChild(new osgearth.Tile([x, y, 0], this, null));
+        var rootSize = this.profile.getTileCount(this.minLevel);
+        for (var x = 0; x < rootSize[0]; x++) {
+            for (var y = 0; y < rootSize[1]; y++) {
+                node.addChild(new osgearth.Tile([x, y, this.minLevel], this, null));
             }
         }
 
@@ -853,13 +855,16 @@ osgearth.Map.prototype = {
 
             var visible = this.imageLayers[i].getVisible() ? true : false;
             var visibleUniform = osg.Uniform.createInt1(visible, "Texture" + i + "Visible");
-            stateSet.addUniform(visibleUniform, osg.StateAttribute.ON); // | osg.StateAttribute.OVERRIDE);
+            stateSet.addUniform(visibleUniform, osg.StateAttribute.ON);
             this.imageLayers[i].visibleUniform = visibleUniform;
 
             var opacity = this.imageLayers[i].getOpacity();
             var opacityUniform = osg.Uniform.createFloat1(opacity, "Texture" + i + "Opacity");
             this.imageLayers[i].opacityUniform = opacityUniform;
-            stateSet.addUniform(opacityUniform, osg.StateAttribute.ON); // | osg.StateAttribute.OVERRIDE);
+            stateSet.addUniform(opacityUniform, osg.StateAttribute.ON);
+
+            var texMatUniform = osg.Uniform.createMatrix4(osg.Matrix.makeIdentity([]), "TexMat"+i );
+            stateSet.addUniform(texMatUniform, osg.StateAttribute.ON);
 
             stateSet.addUniform(osg.Uniform.createInt1(i, "Texture" + i));
         }
@@ -893,9 +898,11 @@ osgearth.Map.prototype = {
 
 //...................................................................
 
-osgearth.Tile = function(key, map) {
+osgearth.Tile = function(key, map, parentTextures) {
 
     osg.Node.call(this);
+
+//    osg.log("Create tile: " + key);
 
     this.key = key;
     this.map = map;
@@ -923,9 +930,8 @@ osgearth.Tile = function(key, map) {
     this.textures = [];
     this.textureReady = [];
     this.numTexturesReady = 0;
-    //this.layerVisibleUniforms = [];
 
-    this.build();
+    this.build(parentTextures);
 };
 
 osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
@@ -954,8 +960,10 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
             else if (this.textures[i].isImageReady()) {
                 this.textureReady[i] = true;
                 // in no-wait mode, remove the uniform that hides a not-yet-ready layer
-                if (!this.map.waitForAllLayers)
-                    osg.StateSet.removeUniform(this.geometry.getStateSet(), "Texture" + i + "Visible");
+                if (this.map.waitForAllLayers === false) {
+                    osg.StateSet.removeUniform(this.getStateSet(), "TexMat" + i);
+                    this.getStateSet().setTextureAttributeAndMode(i, this.textures[i]);
+                }
                 this.numTexturesReady++;
             }
         }
@@ -966,7 +974,7 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
         this.subtilesRequested = false;
     },
 
-    build: function() {
+    build: function(parentTextures) {
         var verts = [];
         var elements = [];
         var normals = [];
@@ -1059,23 +1067,32 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
         this.geometry.getPrimitives().push(tris);
 
         // the textures:     
-        var stateSet = this.geometry.getOrCreateStateSet();
+        var stateSet = this.getOrCreateStateSet();
+        var geomStateSet = this.geometry.getOrCreateStateSet();
 
         for (var i = 0, n = this.map.imageLayers.length; i < n; i++) {
             var layer = this.map.imageLayers[i];
-            var tex = layer.createTexture(this.key, this.map.profile);
-            this.textures.push(tex);
+            var newTex = layer.createTexture(this.key, this.map.profile);
+            this.textures.push(newTex);
             this.textureReady.push(false);
-            stateSet.setTextureAttributeAndMode(i, tex);
-            eval("this.geometry.getAttributes().TexCoord" + i + " = osg.BufferArray.create(gl.ARRAY_BUFFER, texcoords0, 2);");
 
-            // in no-wait mode, install a temporary uniform that will override the layer
-            // uniform. This will hide the layer image until it is fully loaded. The uniform
-            // is later removed in checkTextures()
-            if (!this.map.waitForAllLayers && i > 0) {
-                var visible = osg.Uniform.createInt1(0, "Texture" + i + "Visible");
-                stateSet.addUniform(visible, osg.StateAttribute.ON);
+            if (parentTextures === null || this.map.waitForAllLayers ) {
+                stateSet.setTextureAttributeAndMode(i, newTex);
             }
+            else {
+                //stateSet.setTextureAttributeAndMode(i, parentTextures[i]);
+
+                var texMat = [
+                    0.5, 0, 0, 0,
+                    0.0, 0.5, 0, 0,
+                    0.0, 0.0, 0.0, 0.0,
+                    (this.key[0] % 2) * 0.5, (1 - this.key[1] % 2) * 0.5, 0, 0];
+
+                var texMatU = osg.Uniform.createMatrix4(texMat, "TexMat" + i);
+                stateSet.addUniform(texMatU, osg.StateAttribute.ON);
+            }
+
+            eval("this.geometry.getAttributes().TexCoord" + i + " = osg.BufferArray.create(gl.ARRAY_BUFFER, texcoords0, 2);");
         }
 
         this.xform = new osg.MatrixTransform();
@@ -1100,7 +1117,7 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
 
     requestSubtiles: function() {
         for (var q = 0; q < 4; q++)
-            this.addChild(new osgearth.Tile(osgearth.TileKey.child(this.key, q), this.map));
+            this.addChild(new osgearth.Tile(osgearth.TileKey.child(this.key, q), this.map, this.textures));
         this.subtilesRequested = true;
     },
 
@@ -1138,7 +1155,8 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
                     traverseChildren = false;
                 }
                 else {
-                    if (!this.subtilesRequested) {
+                    // if this tile's content is all loaded, it's ok to start requesting subtiles.
+                    if (!this.subtilesRequested && (this.key[2] == this.map.minLevel || this.allTexturesReady())) {
                         this.requestSubtiles();
                         traverseChildren = false;
                     }
@@ -1146,6 +1164,8 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
                         traverseChildren = false;
                     }
                     else {
+                        // in "wait for all layers" mode, don't traverse this tile's children
+                        // until they have each loaded all of their textures.
                         if (this.map.waitForAllLayers) {
                             for (var i = 0; i < this.children.length; i++) {
                                 var child = this.children[i];
@@ -1155,6 +1175,9 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
                                 }
                             }
                         }
+
+                        // in non-waiting mode, traverse the children as long as each one
+                        // has loaded it's base layer (layer 0).
                         else {
                             for (var i = 0; i < this.children.length; i++) {
                                 var child = this.children[i];
@@ -1184,6 +1207,11 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
 osgearth.Tile.prototype.objectType = osg.objectType.generate("Tile");
 
 osg.CullVisitor.prototype[osgearth.Tile.prototype.objectType] = function(node) {
-    //if (node.traverse)
-        this.traverse(node);
+    if (node.stateset)
+        this.pushStateSet(node.stateset);
+
+    this.traverse(node);
+
+    if (node.stateset)
+        this.popStateSet();
 };
