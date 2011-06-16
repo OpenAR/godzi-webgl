@@ -137,9 +137,6 @@ godzi.PositionedElement.prototype = {
       if (this.element._lastSize !== undefined ) {
 	    var changed = (this.element._lastSize[0] != this.element.width() ||
 		               this.element._lastSize[1] != this.element.height());
-		if (changed) {
-		  osgearth.log("Size changed");
-		}
 		return changed;
 		
 	  }
