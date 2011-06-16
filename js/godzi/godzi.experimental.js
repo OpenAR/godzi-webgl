@@ -388,7 +388,7 @@ godzi.WOEIDWeatherLayer.prototype = {
 		{
 		    if (this.icons[id].popup != undefined)
 			{
-				this.positionEngine.removeElement(icons[id].popup);
+				this.positionEngine.removeElement(this.icons[id].popup);
 				active = true;
 			}
 				

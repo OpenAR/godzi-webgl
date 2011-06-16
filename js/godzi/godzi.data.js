@@ -167,8 +167,10 @@ godzi.GeoRSSReader.prototype = {
 					var lat = undefined;
 					var lon = undefined;
 					
-				    //var point = $(this).find('georss\\:point').text();
-					var point = $(this).find('point').text();
+				    var point = $(this).find('georss\\:point').text();
+					if (point == "")
+					    point = $(this).find('point').text();
+						
 					if (point != "")
 					{
 					    lat = point.split(" ")[0];
@@ -176,10 +178,14 @@ godzi.GeoRSSReader.prototype = {
 					}
 					else
 					{
-					    //lat = $(this).find('geo\\:lat').text();
-					    //lon = $(this).find('geo\\:long').text();
-						lat = $(this).find('lat').text();
-					    lon = $(this).find('long').text();
+					    lat = $(this).find('geo\\:lat').text();
+					    lon = $(this).find('geo\\:long').text();
+						
+						if (lat == "" || lon == "")
+						{
+							lat = $(this).find('lat').text();
+							lon = $(this).find('long').text();
+						}
 					}
 					
 					var description = undefined;
