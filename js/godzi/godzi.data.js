@@ -38,10 +38,7 @@ godzi.TMSImageLayer.prototype = osg.objectInehrit(osgearth.ImageLayer.prototype,
           imageURL += "?" + this.args;
         }
 
-        if (osgearth.ProxyHost !== undefined && osgearth.ProxyHost != null) {
-          imageURL = osgearth.ProxyHost + encodeURIComponent(imageURL);
-        }
-        return imageURL;
+        return osgearth.getURL( imageURL );		
     },
 
     createTexture: function(key, profile) {
@@ -66,11 +63,7 @@ godzi.ArcGISImageLayer.prototype = osg.objectInehrit(osgearth.ImageLayer.prototy
           imageURL += "?" + this.args;
         }
 
-        if (osgearth.ProxyHost !== undefined && osgearth.ProxyHost != null) {
-          imageURL = osgearth.ProxyHost + encodeURIComponent(imageURL);
-        }
-
-        return imageURL;
+        return osgearth.getURL( imageURL );		
     },
 
     createTexture: function(key, profile) {
@@ -128,12 +121,8 @@ godzi.WMSImageLayer.prototype = osg.objectInehrit(osgearth.ImageLayer.prototype,
         if (this.args !== undefined && this.args != null) {		  
           imageURL += "&" + this.args;
         }
-
-        if (osgearth.ProxyHost !== undefined && osgearth.ProxyHost != null) {
-          imageURL = osgearth.ProxyHost + encodeURIComponent(imageURL);
-        }
-
-        return imageURL;
+		
+		return osgearth.getURL( imageURL );
     },
 
     createTexture: function(key, profile) {
