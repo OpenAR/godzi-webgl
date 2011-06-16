@@ -113,8 +113,7 @@ godzi.PositionedElement = function(id, lon, lat, alt, options) {
     if (this.element) {
         this.ownsElement = false;    
     }
-  }
-  
+  } 
 }
 
 godzi.PositionedElement.prototype = {  
@@ -132,6 +131,19 @@ godzi.PositionedElement.prototype = {
       this.alt = alt;
       _dirty = true;
     }      
+  },
+  
+  sizeChanged: function() {
+      if (this.element._lastSize !== undefined ) {
+	    var changed = (this.element._lastSize[0] != this.element.width() ||
+		               this.element._lastSize[1] != this.element.height());
+		if (changed) {
+		  osgearth.log("Size changed");
+		}
+		return changed;
+		
+	  }
+	  return true;
   },
   
   update : function(mapView) {
@@ -175,13 +187,17 @@ godzi.PositionedElement.prototype = {
         } 
       }
       
+	  var width = this.element.width();
       if (this.hAlign == "right") {
-        x = x - this.element.width();
+        x = x - width;
       }
       
-      if (this.vAlign == "bottom") {
-        y = y - this.element.height();
+	  var height = this.element.height();
+      if (this.vAlign == "bottom") {	  
+        y = y - height;
       }      
+	  
+	  this.element._lastSize = [width, height];
           
       this.element.position( {        
         my: "left top",
@@ -327,7 +343,7 @@ godzi.PositionEngine.prototype = {
 	mapView._inverseViewMatrix = osg.Matrix.inverse( viewMatrix );                        
 
 	for (var i = 0; i < this.elements.length; i++) {
-	  if (viewChanged || this.elements[i]._dirty) {
+	  if (viewChanged || this.elements[i]._dirty || this.elements[i].sizeChanged()) {
 		this.elements[i].update(this.mapView);
 	  }
 	}
