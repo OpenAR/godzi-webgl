@@ -1151,23 +1151,12 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
         this.subtilesRequested = true;
     },
 
-    getEyePoint: function(visitor) {
-        var lastViewMatrix = visitor.modelviewMatrixStack[visitor.modelviewMatrixStack.length - 1];
-        var mvmInv = [];
-        osg.Matrix.inverse(lastViewMatrix, mvmInv);
-        var eye = [];
-        osg.Matrix.getTrans(mvmInv, eye);
-        return eye;
-    },
-
     traverse: function(visitor) {
 
         if (visitor.modelviewMatrixStack !== undefined) { // i.e., in cull visitor
 
-            var eye = visitor.eyePoint;  //this.getEyePoint(visitor);
-
             var centerToEye = [0,0,0];
-            osg.Vec3.sub(eye, this.centerWorld, centerToEye);
+            osg.Vec3.sub(visitor.eyePoint, this.centerWorld, centerToEye);
             osg.Vec3.normalize(centerToEye, centerToEye);
 
             if (this.key[2] == 0 || !this.map.geocentric || osg.Vec3.dot(centerToEye, this.centerNormal) >= this.deviation) {
@@ -1176,7 +1165,7 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
                 this.map.markTileDrawn(this);
 
                 var bound = this.getBound();
-                var range2 = osg.Vec3.length2(osg.Vec3.sub(eye, bound.center(), []));
+                var range2 = osg.Vec3.length2(osg.Vec3.sub(visitor.eyePoint, bound.center(), []));
 
                 var traverseChildren = true;
                 var numChildren = this.children.length;

@@ -639,13 +639,13 @@ godzi.MapView.prototype = {
         var render = function() {
             window.requestAnimationFrame(render, this.canvas);
             that.viewer.frame();
-            that.map.frame();
             if (that.frameEnd !== undefined && that.frameEnd != null) {
-            //Fire off any frame end callbacks
+                //Fire off any frame end callbacks
                 for (var i = 0; i < that.frameEnd.length; i++) {
                   that.frameEnd[i]();
                 }
             }
+            that.map.frame();
         };
         render();
     },
