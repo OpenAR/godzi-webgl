@@ -18,6 +18,16 @@ osgearth.log = function(str) {
     }
 };
 
+osgearth.ProxyHost = "proxy.php?url=";
+
+//Makes a URL prepended by the ProxyHost if it's set
+osgearth.getURL = function(url) {
+   if (osgearth.ProxyHost !== undefined && osgearth.ProxyHost != null) {
+	  return url = osgearth.ProxyHost + encodeURIComponent(url);
+	}
+	return url;
+}
+
 //........................................................................
 
 // OSG extensions ... 
