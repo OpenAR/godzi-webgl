@@ -758,13 +758,33 @@ osgearth.Map = function(args) {
     // whether the map is round (geocentric) or flat (projected)
     this.geocentric = true;
 
+    // start at this level
+    this.minLevel = 0;
+
+    // don't subdivide beyond this level
+    this.maxLevel = 22;
+
+    // whether to draw a tile before all the layers have loaded
+    this.waitForAllLayers = true;
+
+    // scale factor for tile paging
+    this.zoomScale = 1.0;
+
     if (args !== undefined) {
         if (args.profile !== undefined)
             this.profile = args.profile;
         if (args.threeD !== undefined)
             this.threeD = args.threeD;
-        if (args.twoD != undefined)
+        if (args.twoD !== undefined)
             this.threeD = (args.twoD !== true);
+        if (args.minLevel !== undefined)
+            this.minLevel = args.minLevel;
+        if (args.maxLevel !== undefined)
+            this.maxLevel = args.maxLevel;
+        if (args.waitForAllLayers !== undefined)
+            this.waitForAllLayers = args.waitForAllLayers;
+        if (args.zoomScale !== undefined)
+            this.zoomScale = args.zoomScale;
         if (args.geocentric !== undefined)
             this.geocentric = args.geocentric;
         else if (this.threeD === false)
@@ -785,14 +805,6 @@ osgearth.Map = function(args) {
 
     // you can monitor this value to see how many tiles are being drawn each frame.
     this.drawListSize = 0;
-
-    // start at this level
-    this.minLevel = 2;
-
-    // don't subdivide beyond this level
-    this.maxLevel = 22;
-
-    this.waitForAllLayers = true;
 };
 
 osgearth.Map.prototype = {
@@ -1128,7 +1140,7 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
         this.xform.setMatrix(tile2world);
         this.xform.addChild(this.geometry);
 
-        this.subtileRange2 = (this.getBound().radius() * 3);
+        this.subtileRange2 = this.getBound().radius() * 3 * this.map.zoomScale;
         this.subtileRange2 *= this.subtileRange2;
 
         // for geocentric maps, get the tile's deviation for geocentric normal-based culling

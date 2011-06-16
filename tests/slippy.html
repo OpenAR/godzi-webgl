@@ -83,16 +83,17 @@
 
         // create a map model:
         var map = new godzi.Map({
-            profile: new osgearth.MercatorProfile(),
-            threeD: false,
-            geocentric: false
+            profile:     new osgearth.MercatorProfile(),
+            threeD:      false,
+            geocentric:  false,
+            zoomScale:   0.75
         });
 
         map.addImageLayer(new godzi.TMSImageLayer({
-            name: "OSM",
-            url: "http://tile.openstreetmap.org/",
-            imageType: "png",
-            baseLevel: 1
+            name:       "OSM",
+            url:        "http://tile.openstreetmap.org/",
+            imageType:  "png",
+            baseLevel:  1
         }));
 
         // create a view tied to a page element:
