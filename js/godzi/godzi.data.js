@@ -155,7 +155,7 @@ godzi.GeoRSSReader.prototype = {
 			{
 			  url:this.url,
 			  type: "GET",
-			  //dataType: "xml",
+			  dataType: "xml",
 			  
 			  success: function(data)
 			  {
@@ -164,7 +164,8 @@ godzi.GeoRSSReader.prototype = {
 					var lat = undefined;
 					var lon = undefined;
 					
-				    var point = $(this).find('georss\\:point').text();
+				    //var point = $(this).find('georss\\:point').text();
+					var point = $(this).find('point').text();
 					if (point != "")
 					{
 					    lat = point.split(" ")[0];
@@ -172,17 +173,11 @@ godzi.GeoRSSReader.prototype = {
 					}
 					else
 					{
-					    lat = $(this).find('geo\\:lat').text();
-					    lon = $(this).find('geo\\:long').text();
+					    //lat = $(this).find('geo\\:lat').text();
+					    //lon = $(this).find('geo\\:long').text();
+						lat = $(this).find('lat').text();
+					    lon = $(this).find('long').text();
 					}
-					
-					var link = $(this).find('link').eq(0).attr('href');
-					try
-					{
-						if (link == undefined || link == "")
-						  link = $(this).find('link').eq(0)[0].nextSibling.data;
-					}
-					catch (e) { }
 					
 					var description = undefined;
 					try
@@ -199,7 +194,7 @@ godzi.GeoRSSReader.prototype = {
 								 author: $(this).find('author').text(),
 								 pubDate: $(this).find('pubDate').text(),
 								 description: description,
-								 link: link,
+								 link: $(this).find('link').text(),
 								 latitude: lat,
 								 longitude: lon,
 								 src: $(this).get() });

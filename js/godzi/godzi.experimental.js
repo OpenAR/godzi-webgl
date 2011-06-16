@@ -336,9 +336,10 @@ godzi.PositionEngine.prototype = {
 
 //........................................................................
 
-godzi.WOEIDWeatherLayer = function(mapView, places, proxy, iconOptions) {
+godzi.WOEIDWeatherLayer = function(mapView, places, rate, proxy, iconOptions) {
     this.positionEngine = new godzi.PositionEngine(mapView);
 	this.places = places;
+	this.rate = rate;
 	this.proxy = proxy;
 	
 	var defaults = {
@@ -373,7 +374,7 @@ godzi.WOEIDWeatherLayer.prototype = {
 	    var url = this.proxy + 'http://weather.yahooapis.com/forecastrss?w=' + id;
 		var thisObj = this;
 		var renderer = this.options.renderer;
-		this.readers[id] = new godzi.GeoRSSReader(url, 60, function(items) {
+		this.readers[id] = new godzi.GeoRSSReader(url, this.rate, function(items) {
 		    if (renderer != undefined)
 			    renderer(items[0], id);
 			else
@@ -435,14 +436,7 @@ godzi.WOEIDWeatherLayer.prototype = {
 	},
 	
 	createIconPopup: function(icon, id, lat, lon, title, content, url) {
-		//special test for Yahoo weather image
-		var imgData = "";
-	    if ($(content)[0].nodeType == 8)
-			imgData = $(content)[0].data.replace('[CDATA[', '') + '>';
-		
-		var html = '<div class="weather_popup_background"><div class="weather_popup"><h4 class="weather_popup">' + title + '</h4>' + '<div class="weather_popup_image">' + imgData + '</div><br />' + content.replace(']]&gt;', '') + '</div></div>';
-		
-		var htmlElem = $(html);
+		var htmlElem = $('<div class="weather_popup_background"><div class="weather_popup"><h4 class="weather_popup">' + title + '</h4>' + content + '</div></div>');		
 		jQuery("body").append(htmlElem);
 		
 		htmlElem[0].onselectstart = function() { return false; }

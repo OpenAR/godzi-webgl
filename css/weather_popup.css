@@ -4,16 +4,20 @@
 
 .weather_popup {
 	color: #006;
-	font-size: 0.65em;
+	font-size: 0.6em;
 	font-family: sans-serif;
 	padding: 4px;
-	text-align: top;
 }
 div.weather_popup {
-	width: 292px;
+	width: 262px;
 }
 
-h4.weather_popup {
+.weather_popup img {
+	background-color: #fff;
+	border: 2px solid #666;
+}
+
+.weather_popup h4 {
 	font-size: 1.1em;
 	font-weight: bold;
 }
@@ -33,11 +37,4 @@ div.weather_popup_background {
 	border-radius: 15px;
 	background-image: url('../images/weather_back.gif');
 	opacity: 0.8;
-}
-
-div.weather_popup_image {
-	background-color: #fff;
-	border: 2px solid #666;
-	float: left;
-	margin: 4px 4px 4px 0px;
 }
