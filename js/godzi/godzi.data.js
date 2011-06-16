@@ -37,6 +37,10 @@ godzi.TMSImageLayer.prototype = osg.objectInehrit(osgearth.ImageLayer.prototype,
         if (this.args !== undefined && this.args != null) {
           imageURL += "?" + this.args;
         }
+
+        if (osgearth.ProxyHost !== undefined && osgearth.ProxyHost != null) {
+          imageURL = osgearth.ProxyHost + encodeURIComponent(imageURL);
+        }
         return imageURL;
     },
 
@@ -61,6 +65,11 @@ godzi.ArcGISImageLayer.prototype = osg.objectInehrit(osgearth.ImageLayer.prototy
         if (this.args !== undefined && this.args != null) {
           imageURL += "?" + this.args;
         }
+
+        if (osgearth.ProxyHost !== undefined && osgearth.ProxyHost != null) {
+          imageURL = osgearth.ProxyHost + encodeURIComponent(imageURL);
+        }
+
         return imageURL;
     },
 
@@ -119,6 +128,11 @@ godzi.WMSImageLayer.prototype = osg.objectInehrit(osgearth.ImageLayer.prototype,
         if (this.args !== undefined && this.args != null) {		  
           imageURL += "&" + this.args;
         }
+
+        if (osgearth.ProxyHost !== undefined && osgearth.ProxyHost != null) {
+          imageURL = osgearth.ProxyHost + encodeURIComponent(imageURL);
+        }
+
         return imageURL;
     },
 
