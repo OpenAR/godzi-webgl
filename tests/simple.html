@@ -55,7 +55,7 @@
 
 <script type="text/javascript">
 
-    godzi.init("../js/", function() {
+    godzi.init("../js/", function() {        
 
         // create a map model:
         var map = new godzi.Map();
@@ -84,7 +84,8 @@
             jQuery("#Coords").html(
                 "Lat: " + lla[1].toFixed(2) + "\u00B0" + "  Long = " + lla[0].toFixed(2) + "\u00B0" + "<br/>" +
                 "Azim: " + Math.rad2deg(mapView.viewer.manipulator.localAzim).toFixed(1) + "\u00B0" +
-                "  Pitch:" + Math.rad2deg(mapView.viewer.manipulator.localPitch).toFixed(1) + "\u00B0");
+                "  Pitch:" + Math.rad2deg(mapView.viewer.manipulator.localPitch).toFixed(1) + "\u00B0" + "<br/>" +
+                "Tiles: " + map.drawListSize);
         });
     });
 

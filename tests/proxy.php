@@ -36,10 +36,16 @@ curl_setopt($session, CURLOPT_RETURNTRANSFER, true);
 
 // Make the call
 $response = curl_exec($session);
+$content_type = curl_getinfo( $session, CURLINFO_CONTENT_TYPE );
 
 if ($mimeType != "")
 {
+	// The web service returns XML. Set the Content-Type appropriately
 	header("Content-Type: ".$mimeType);
+}
+else
+{
+        header("Content-Type: ".$content_type);
 }
 
 echo $response;

@@ -37,7 +37,8 @@ godzi.TMSImageLayer.prototype = osg.objectInehrit(osgearth.ImageLayer.prototype,
         if (this.args !== undefined && this.args != null) {
           imageURL += "?" + this.args;
         }
-        return imageURL;
+
+        return osgearth.getURL( imageURL );		
     },
 
     createTexture: function(key, profile) {
@@ -61,7 +62,8 @@ godzi.ArcGISImageLayer.prototype = osg.objectInehrit(osgearth.ImageLayer.prototy
         if (this.args !== undefined && this.args != null) {
           imageURL += "?" + this.args;
         }
-        return imageURL;
+
+        return osgearth.getURL( imageURL );		
     },
 
     createTexture: function(key, profile) {
@@ -119,7 +121,8 @@ godzi.WMSImageLayer.prototype = osg.objectInehrit(osgearth.ImageLayer.prototype,
         if (this.args !== undefined && this.args != null) {		  
           imageURL += "&" + this.args;
         }
-        return imageURL;
+		
+		return osgearth.getURL( imageURL );
     },
 
     createTexture: function(key, profile) {
