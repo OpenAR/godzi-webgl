@@ -1,74 +1,5 @@
 <html>
 <head>
-
-<style>
-    body {
-        background: black;
-        overflow:hidden;
-        padding:0;
-        margin:0;
-        color: white;
-    }
-    
-    #header 
-    {
-        margin: 0;
-        padding: 5;
-        background: #c60;
-        color: #fff;
-        font-family: Arial;
-        font-weight: bold;
-    }    
-
-    #ViewContainer 
-    {
-        clear: both;
-        position: absolute;
-    }
-    
-    #Help
-    {
-        float:left;
-        position:absolute;
-        z-index:10;
-        margin-left: 5;
-    }
-    
-    #Coords
-    {
-	    float: left;
-        position: absolute;
-		bottom: 2px;
-		left: 2px;
-        z-index: 10;
-        margin: 2;
-        padding: 2;
-    }
-
-    #Search
-    {
-	    float: right;
-		clear: both;
-		position: relative;
-		z-index: 10;
-		margin: 2;
-		padding: 2;
-	}
-	
-	#InputSearch
-	{
-	    font-size: 0.75em;
-		color: #fff;
-		background-color: #000;
-		opacity: 0.6;
-		border: 1px solid #999;
-		padding: 1px 2px;
-	}
-    
-    a { color: #ffffff; }
-    
-</style>
-
 <title>Godzi WebGL</title>
 
 <meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
@@ -79,6 +10,7 @@
 <script type="text/javascript" src="../js/data/world_cities.js"></script>
 
 <link href="../css/ui-lightness/jquery.ui.all.css" rel="stylesheet" type="text/css"></link>
+<link href="demo.css" rel="Stylesheet" type="text/css"></link>
 <link href="../css/weather_popup.css" rel="stylesheet" type="text/css"></link>
 
 <script type="text/javascript">
@@ -92,13 +24,7 @@
             url: "http://readymap.org/readymap/tiles/1.0.0/22/",
             tmsType: "google"
         }));
-
-        //map.addImageLayer(new godzi.TMSImageLayer({
-        //    name: "OSM",
-        //    url: "http://readymap.org/readymap/tiles/1.0.0/35/",
-        //    tmsType: "google"
-        //}));
-
+        
         // create a view tied to a page element:
         var size = godzi.getWindowSize();
         var headerHeight = jQuery('#header').height();
