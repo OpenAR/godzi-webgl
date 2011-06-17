@@ -113,8 +113,7 @@ godzi.PositionedElement = function(id, lon, lat, alt, options) {
     if (this.element) {
         this.ownsElement = false;    
     }
-  }
-  
+  } 
 }
 
 godzi.PositionedElement.prototype = {  
@@ -132,6 +131,16 @@ godzi.PositionedElement.prototype = {
       this.alt = alt;
       _dirty = true;
     }      
+  },
+  
+  sizeChanged: function() {
+      if (this.element._lastSize !== undefined ) {
+	    var changed = (this.element._lastSize[0] != this.element.width() ||
+		               this.element._lastSize[1] != this.element.height());
+		return changed;
+		
+	  }
+	  return true;
   },
   
   update : function(mapView) {
@@ -175,13 +184,17 @@ godzi.PositionedElement.prototype = {
         } 
       }
       
+	  var width = this.element.width();
       if (this.hAlign == "right") {
-        x = x - this.element.width();
+        x = x - width;
       }
       
-      if (this.vAlign == "bottom") {
-        y = y - this.element.height();
+	  var height = this.element.height();
+      if (this.vAlign == "bottom") {	  
+        y = y - height;
       }      
+	  
+	  this.element._lastSize = [width, height];
           
       this.element.position( {        
         my: "left top",
@@ -327,7 +340,7 @@ godzi.PositionEngine.prototype = {
 	mapView._inverseViewMatrix = osg.Matrix.inverse( viewMatrix );                        
 
 	for (var i = 0; i < this.elements.length; i++) {
-	  if (viewChanged || this.elements[i]._dirty) {
+	  if (viewChanged || this.elements[i]._dirty || this.elements[i].sizeChanged()) {
 		this.elements[i].update(this.mapView);
 	  }
 	}
@@ -336,9 +349,10 @@ godzi.PositionEngine.prototype = {
 
 //........................................................................
 
-godzi.WOEIDWeatherLayer = function(mapView, places, proxy, iconOptions) {
+godzi.WOEIDWeatherLayer = function(mapView, places, rate, proxy, iconOptions) {
     this.positionEngine = new godzi.PositionEngine(mapView);
 	this.places = places;
+	this.rate = rate;
 	this.proxy = proxy;
 	
 	var defaults = {
@@ -373,7 +387,7 @@ godzi.WOEIDWeatherLayer.prototype = {
 	    var url = this.proxy + 'http://weather.yahooapis.com/forecastrss?w=' + id;
 		var thisObj = this;
 		var renderer = this.options.renderer;
-		this.readers[id] = new godzi.GeoRSSReader(url, 60, function(items) {
+		this.readers[id] = new godzi.GeoRSSReader(url, this.rate, function(items) {
 		    if (renderer != undefined)
 			    renderer(items[0], id);
 			else
@@ -387,7 +401,7 @@ godzi.WOEIDWeatherLayer.prototype = {
 		{
 		    if (this.icons[id].popup != undefined)
 			{
-				this.positionEngine.removeElement(icons[id].popup);
+				this.positionEngine.removeElement(this.icons[id].popup);
 				active = true;
 			}
 				
@@ -435,14 +449,7 @@ godzi.WOEIDWeatherLayer.prototype = {
 	},
 	
 	createIconPopup: function(icon, id, lat, lon, title, content, url) {
-		//special test for Yahoo weather image
-		var imgData = "";
-	    if ($(content)[0].nodeType == 8)
-			imgData = $(content)[0].data.replace('[CDATA[', '') + '>';
-		
-		var html = '<div class="weather_popup_background"><div class="weather_popup"><h4 class="weather_popup">' + title + '</h4>' + '<div class="weather_popup_image">' + imgData + '</div><br />' + content.replace(']]&gt;', '') + '</div></div>';
-		
-		var htmlElem = $(html);
+		var htmlElem = $('<div class="weather_popup_background"><div class="weather_popup"><h4 class="weather_popup">' + title + '</h4>' + content + '</div></div>');		
 		jQuery("body").append(htmlElem);
 		
 		htmlElem[0].onselectstart = function() { return false; }
