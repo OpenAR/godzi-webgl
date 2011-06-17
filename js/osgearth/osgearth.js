@@ -22,11 +22,14 @@ osgearth.ProxyHost = "proxy.php?url=";
 
 //Makes a URL prepended by the ProxyHost if it's set
 osgearth.getURL = function(url) {
-   if (osgearth.ProxyHost !== undefined && osgearth.ProxyHost != null) {
-	  return url = osgearth.ProxyHost + encodeURIComponent(url);
-	}
-	return url;
-}
+    if (osgearth.ProxyHost !== null && window.document.URL.indexOf("file:") === 0) {
+        osgearth.ProxyHost = null;
+    }
+    if (osgearth.ProxyHost !== undefined && osgearth.ProxyHost !== null) {
+        url = osgearth.ProxyHost + encodeURIComponent(url);
+    }
+    return url;
+};
 
 //........................................................................
 
@@ -34,19 +37,21 @@ osgearth.getURL = function(url) {
 // eventually submit all this stuff to osgjs:
 
 osg.Quat.zeroRotation = function(q) {
-    return q[0] == 0 && q[1] == 0 & q[2] == 0 && q[3] == 1;
+    return q[0] === 0 && q[1] === 0 && q[2] === 0 && q[3] === 1;
 };
 
 // osgjs's Quat.mult backwards?
 osg.Quat.multiply = function(a, b, r) {
-    if (r === undefined)
+    if (r === undefined) {
         r = [];
+    }
     return osg.Quat.mult(b, a, r);
-}
+};
 
 osg.Quat.rotateVecOnToVec = function(from, to, r) {
-    if (r === undefined)
+    if (r === undefined) {
         r = [];
+    }
 
     var sourceVector = osg.Vec3.copy(from, []);
     var targetVector = osg.Vec3.copy(to, []);
@@ -73,22 +78,23 @@ osg.Quat.rotateVecOnToVec = function(from, to, r) {
     var dotProdPlus1 = 1.0 + osg.Vec3.dot(sourceVector, targetVector);
 
     if (dotProdPlus1 < 1e-7) {
+        var norm;
         if (Math.abs(sourceVector[0]) < 0.6) {
-            var norm = Math.sqrt(1.0 - sourceVector[0] * sourceVector[0]);
+            norm = Math.sqrt(1.0 - sourceVector[0] * sourceVector[0]);
             r[0] = 0.0;
             r[1] = sourceVector[2] / norm;
             r[2] = -sourceVector[1] / norm;
             r[3] = 0.0;
         }
         else if (Math.abs(sourceVector[1]) < 0.6) {
-            var norm = Math.sqrt(1.0 - sourceVector[1] * sourceVector[1]);
+            norm = Math.sqrt(1.0 - sourceVector[1] * sourceVector[1]);
             r[0] = -sourceVector[2] / norm;
             r[1] = 0.0;
             r[2] = sourceVector[0] / norm;
             r[3] = 0.0;
         }
         else {
-            var norm = Math.sqrt(1.0 - sourceVector[2] * sourceVector[2]);
+            norm = Math.sqrt(1.0 - sourceVector[2] * sourceVector[2]);
             r[0] = sourceVector[1] / norm;
             r[1] = -sourceVector[0] / norm;
             r[2] = 0.0;
@@ -192,27 +198,29 @@ osgearth.ShaderFactory.createFragmentShaderMain = function(functions) {
 
 osgearth.ShaderFactory.createVertexSetupTexturing = function(imageLayers) {
     var buf = "";
-    
-    for( var unit=0; unit<imageLayers.length; unit++ ) {
+    var unit;
+
+    for (unit = 0; unit < imageLayers.length; ++unit) {
         buf += "attribute vec2 TexCoord" + unit + ";\n";
-        buf += "uniform mat4 TexMat" + unit + ";\n"
+        buf += "uniform mat4 TexMat" + unit + ";\n";
         buf += "varying vec2 FragTexCoord" + unit + ";\n";
     }
-    
+
     buf += "void osgearth_vert_setupTexturing(void) { \n";
-    
-    for (var unit = 0; unit < imageLayers.length; unit++) {
+
+    for (unit = 0; unit < imageLayers.length; unit++) {
         buf += "    FragTexCoord" + unit + " = (TexMat" + unit + " * vec4(TexCoord" + unit + ",0,1)).xy;\n";
     }
     buf += "}\n";
-    
+
     return buf;
 };
 
 osgearth.ShaderFactory.createFragmentApplyTexturing = function(imageLayers) {
     var buf = "";
+    var unit;
 
-    for (var unit = 0; unit < imageLayers.length; unit++) {
+    for (unit = 0; unit < imageLayers.length; ++unit) {
         buf += "varying vec2 FragTexCoord" + unit + ";\n";
         buf += "uniform sampler2D Texture" + unit + ";\n";
         buf += "uniform bool Texture" + unit + "Visible;\n";
@@ -222,7 +230,7 @@ osgearth.ShaderFactory.createFragmentApplyTexturing = function(imageLayers) {
     buf += "void osgearth_frag_applyTexturing(inout vec4 color) {\n";
     buf += "    vec4 texel;\n";
 
-    for (var unit = 0; unit < imageLayers.length; unit++) {
+    for (unit = 0; unit < imageLayers.length; ++unit) {
         buf += "    if (Texture" + unit + "Visible) { \n";
         buf += "        texel = texture2D(Texture" + unit + ", FragTexCoord" + unit + ".xy );\n";
         buf += "        color = vec4( mix( color.rgb, texel.rgb, texel.a * Texture" + unit + "Opacity), 1);\n";
@@ -306,8 +314,9 @@ osgearth.VirtualProgram.prototype = osg.objectInehrit(osg.Program.prototype, {
     apply: function(state) {
         // pull the stack of "Program" attributes
         var attributeStack = state.attributeMap[this.attributeType];
-        if (attributeStack === undefined)
+        if (attributeStack === undefined) {
             return;
+        }
 
         // constructs a string that uniquely identifies this accumulated shader program.
         // it is a concatenation of all shader semantics in the current attribute stack.
@@ -323,8 +332,9 @@ osgearth.VirtualProgram.prototype = osg.objectInehrit(osg.Program.prototype, {
         }
 
         // add this VP's shaders to the identifier:
-        for (var semantic in this.shaderMap)
+        for (var semantic in this.shaderMap) {
             accumulatedSemantic += semantic;
+        }
 
         // see if our gl program is already in the cache:
         this.program = this.programCache[accumulatedSemantic];
@@ -344,10 +354,12 @@ osgearth.VirtualProgram.prototype = osg.objectInehrit(osg.Program.prototype, {
 
             for (var semantic in this.shaderMap) {
                 var type = parseInt(semantic.split(';')[1]);
-                if (type === gl.VERTEX_SHADER)
+                if (type === gl.VERTEX_SHADER) {
                     vertShaderSource += this.shaderMap[semantic] + '\n';
-                else // if ( semantic.type === gl.FRAGMENT_SHADER )
+                }
+                else { // if ( semantic.type === gl.FRAGMENT_SHADER )
                     fragShaderSource += this.shaderMap[semantic] + '\n';
+                }
             }
 
             this.vertex = osg.Shader.create(gl.VERTEX_SHADER, vertShaderSource);
@@ -393,8 +405,9 @@ osgearth.VirtualProgram.prototype = osg.objectInehrit(osg.Program.prototype, {
     refreshAccumulatedFunctions: function(state) {
         // stack of all VirtualProgram attributes:
         var attributeStack = state.attributeMap[this.attributeType];
-        if (attributeStack === undefined || attributeStack.length == 0)
+        if (attributeStack === undefined || attributeStack.length == 0) {
             return;
+        }
 
         // accumulate all the user functions from all the VPs into a single list:
         this.accumulatedFunctions = {};
