@@ -1144,8 +1144,6 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
                 stateSet.setTextureAttributeAndMode(i, newTex);
             }
             else {
-                //stateSet.setTextureAttributeAndMode(i, parentTextures[i]);
-
                 var texMat = [
                     0.5, 0, 0, 0,
                     0.0, 0.5, 0, 0,
@@ -1156,7 +1154,8 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
                 stateSet.addUniform(texMatU, osg.StateAttribute.ON);
             }
 
-            eval("this.geometry.getAttributes().TexCoord" + i + " = osg.BufferArray.create(gl.ARRAY_BUFFER, texcoords0, 2);");
+            var attrName = "TexCoord" + i;
+            this.geometry.getAttributes()[attrName] = osg.BufferArray.create(gl.ARRAY_BUFFER, texcoords0, 2);
         }
 
         this.xform = new osg.MatrixTransform();
@@ -1190,7 +1189,7 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
 
         if (visitor.modelviewMatrixStack !== undefined) { // i.e., in cull visitor
 
-            var centerToEye = [0,0,0];
+            var centerToEye = [0, 0, 0];
             osg.Vec3.sub(visitor.eyePoint, this.centerWorld, centerToEye);
             osg.Vec3.normalize(centerToEye, centerToEye);
 
