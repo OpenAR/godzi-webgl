@@ -33,12 +33,8 @@ osgearth.getURL = function(url) {
 
 //........................................................................
 
-// OSG extensions ... 
+// OSG extensions ...
 // eventually submit all this stuff to osgjs:
-
-osg.Quat.zeroRotation = function(q) {
-    return q[0] === 0 && q[1] === 0 && q[2] === 0 && q[3] === 1;
-};
 
 // osgjs's Quat.mult backwards?
 osg.Quat.multiply = function(a, b, r) {
@@ -46,6 +42,10 @@ osg.Quat.multiply = function(a, b, r) {
         r = [];
     }
     return osg.Quat.mult(b, a, r);
+};
+
+osg.Quat.zeroRotation = function(q) {
+    return q[0] === 0 && q[1] === 0 && q[2] === 0 && q[3] === 1;
 };
 
 osg.Quat.rotateVecOnToVec = function(from, to, r) {
@@ -200,8 +200,9 @@ osgearth.ShaderFactory.createVertexSetupTexturing = function(imageLayers) {
     var buf = "";
     var unit;
 
+    buf += "attribute vec2 TexCoordShared; \n";
+
     for (unit = 0; unit < imageLayers.length; ++unit) {
-        buf += "attribute vec2 TexCoord" + unit + ";\n";
         buf += "uniform mat4 TexMat" + unit + ";\n";
         buf += "varying vec2 FragTexCoord" + unit + ";\n";
     }
@@ -209,7 +210,7 @@ osgearth.ShaderFactory.createVertexSetupTexturing = function(imageLayers) {
     buf += "void osgearth_vert_setupTexturing(void) { \n";
 
     for (unit = 0; unit < imageLayers.length; unit++) {
-        buf += "    FragTexCoord" + unit + " = (TexMat" + unit + " * vec4(TexCoord" + unit + ",0,1)).xy;\n";
+        buf += "    FragTexCoord" + unit + " = (TexMat" + unit + " * vec4(TexCoordShared,0,1)).xy;\n";
     }
     buf += "}\n";
 
@@ -271,8 +272,6 @@ osgearth.VirtualProgram = function() {
 };
 
 osgearth.VirtualProgram.prototype = osg.objectInehrit(osg.Program.prototype, {
-
-    //VirtualProgramMarker: {},
 
     isVirtualProgram: function(obj) {
         return true;
@@ -1042,7 +1041,6 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
         var verts = [];
         var elements = [];
         var normals = [];
-        var colors = [];
         var texcoords0 = [];
         var corner = [];
 
@@ -1061,7 +1059,7 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
         var world2tile = [];
         osg.Matrix.inverse(tile2world, world2tile);
 
-        var e = 0, v = 0, c = 0, tc = 0, vi = 0;
+        var e = 0, v = 0, tc = 0, vi = 0;
 
         for (var row = 0; row < numRows; row++) {
             var t = row / (numRows - 1);
@@ -1081,9 +1079,6 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
 
                 this.insertArray(normal, normals, v);
                 v += 3;
-
-                this.insertArray([1, 1, 1, 1], colors, c);
-                c += 4;
 
                 if (col < numCols - 1 && row < numRows - 1) {
                     this.insertArray([vi, vi + 1, vi + 1 + numCols, vi + 1 + numCols, vi + numCols, vi], elements, e);
@@ -1110,29 +1105,18 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
             }
         }
 
-        // Draws the center normal vec
-        /*
-        var vert = [];
-        osg.Matrix.transformVec3(ecef2tile, this.centerECEF, vert);
-        this.insertArray(vert, verts, v);
-        v += 3;
-        vert[2] = 1e6;
-        this.insertArray(vert, verts, v);
-        v += 3;
-        this.insertArray([vi, vi + 1], elements, e);
-        e += 2;*/
-
         this.geometry = new osg.Geometry();
         this.geometry.getAttributes().Vertex = osg.BufferArray.create(gl.ARRAY_BUFFER, verts, 3);
         this.geometry.getAttributes().Normal = osg.BufferArray.create(gl.ARRAY_BUFFER, normals, 3);
-        this.geometry.getAttributes().Color = osg.BufferArray.create(gl.ARRAY_BUFFER, colors, 4);
         var tris = new osg.DrawElements(gl.TRIANGLES, osg.BufferArray.create(gl.ELEMENT_ARRAY_BUFFER, elements, 1));
-        //var tris = new osg.DrawElements(gl.LINE_STRIP, osg.BufferArray.create(gl.ELEMENT_ARRAY_BUFFER, elements, 1));
         this.geometry.getPrimitives().push(tris);
 
         // the textures:     
         var stateSet = this.getOrCreateStateSet();
         var geomStateSet = this.geometry.getOrCreateStateSet();
+
+        // shared texture coordinate attribute:
+        this.geometry.getAttributes().TexCoordShared = osg.BufferArray.create(gl.ARRAY_BUFFER, texcoords0, 2);
 
         for (var i = 0, n = this.map.imageLayers.length; i < n; i++) {
             var layer = this.map.imageLayers[i];
@@ -1153,9 +1137,6 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
                 var texMatU = osg.Uniform.createMatrix4(texMat, "TexMat" + i);
                 stateSet.addUniform(texMatU, osg.StateAttribute.ON);
             }
-
-            var attrName = "TexCoord" + i;
-            this.geometry.getAttributes()[attrName] = osg.BufferArray.create(gl.ARRAY_BUFFER, texcoords0, 2);
         }
 
         this.xform = new osg.MatrixTransform();
