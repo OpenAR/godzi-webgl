@@ -200,9 +200,8 @@ osgearth.ShaderFactory.createVertexSetupTexturing = function(imageLayers) {
     var buf = "";
     var unit;
 
-    buf += "attribute vec2 TexCoordShared; \n";
-
     for (unit = 0; unit < imageLayers.length; ++unit) {
+        buf += "attribute vec2 TexCoord" + unit + ";\n";
         buf += "uniform mat4 TexMat" + unit + ";\n";
         buf += "varying vec2 FragTexCoord" + unit + ";\n";
     }
@@ -210,7 +209,7 @@ osgearth.ShaderFactory.createVertexSetupTexturing = function(imageLayers) {
     buf += "void osgearth_vert_setupTexturing(void) { \n";
 
     for (unit = 0; unit < imageLayers.length; unit++) {
-        buf += "    FragTexCoord" + unit + " = (TexMat" + unit + " * vec4(TexCoordShared,0,1)).xy;\n";
+        buf += "    FragTexCoord" + unit + " = (TexMat" + unit + " * vec4(TexCoord" + unit + ",0,1)).xy;\n";
     }
     buf += "}\n";
 
@@ -460,6 +459,10 @@ Math.smoothStepInterp = function(t) {
     return (t * t) * (3.0 - 2.0 * t);
 };
 
+Math.smootherStepInterp = function(t) {
+    return t * t * t * (t * (t * 6 - 15) + 10);
+};
+
 Math.accelerationInterp = function(t, a) {
     return a == 0 ? t : a > 0 ? Math.powFast(t, a) : 1.0 - Math.powFast(1.0 - t, -a);
 };
@@ -684,22 +687,12 @@ osgearth.TileKey = {
         return [parseInt(key[0] / 2), parseInt(key[1] / 2), lod - 1];
     },
 
-    child: function(key, quadrant) {
-        var x = key[0] * 2;
-        var y = key[1] * 2;
-        if (quadrant == 1) {
-            x += 1;
-        }
-        else if (quadrant == 2) {
-            y += 1;
-        }
-        else if (quadrant == 3) {
-            x += 1;
-            y += 1;
-        }
+    child: function(key, q) {
+        var x = (key[0] * 2) + (q == 1 ? 1 : 0) + (q == 3 ? 1 : 0);
+        var y = (key[1] * 2) + (q == 2 ? 1 : 0) + (q == 3 ? 1 : 0);
         return [x, y, key[2] + 1];
     },
-    
+
     getExtent: function(key, profile) {
         var size = profile.getTileSize(key[2]);
         var xmin = profile.extent.xmin + (size[0] * key[0]);
@@ -1116,7 +1109,7 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
         var geomStateSet = this.geometry.getOrCreateStateSet();
 
         // shared texture coordinate attribute:
-        this.geometry.getAttributes().TexCoordShared = osg.BufferArray.create(gl.ARRAY_BUFFER, texcoords0, 2);
+        var sharedTexCoordAttr = osg.BufferArray.create(gl.ARRAY_BUFFER, texcoords0, 2);
 
         for (var i = 0, n = this.map.imageLayers.length; i < n; i++) {
             var layer = this.map.imageLayers[i];
@@ -1137,6 +1130,8 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
                 var texMatU = osg.Uniform.createMatrix4(texMat, "TexMat" + i);
                 stateSet.addUniform(texMatU, osg.StateAttribute.ON);
             }
+
+            this.geometry.getAttributes()["TexCoord" + i] = sharedTexCoordAttr;
         }
 
         this.xform = new osg.MatrixTransform();
