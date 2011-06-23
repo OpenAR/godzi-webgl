@@ -125,6 +125,41 @@ osg.StateSet.removeUniform = function(stateSet, name) {
     }
 };
 
+osg.BufferArray.destroy = function(ba) {
+    if (ba !== undefined && ba !== null) {
+        if (ba.buffer !== undefined && ba.buffer !== null) {
+            gl.deleteBuffer(ba.buffer);
+        }
+    }
+};
+
+osg.Geometry.destroy = function(geom) {
+    if (geom !== undefined && geom !== null) {
+        var i;
+        for (i in geom.attributes) {
+            osg.BufferArray.destroy(geom.attributes[i]);
+        }
+        for (i in geom.primitives) {
+            var prim = geom.primitives[i];
+            if (prim !== undefined && prim !== null) {
+                if (prim.indices !== undefined && prim.indices !== null) {
+                    osg.BufferArray.destroy(prim.indicies);
+                }
+            }
+        }
+    }
+};
+
+osg.Texture.destroy = function(tex) {
+    if (tex !== undefined && tex !== null) {
+        if (tex.textureObject !== null) {
+            gl.deleteTexture(tex.textureObject);
+            tex.textureObject = null;
+            tex.image = undefined;
+        }
+    }
+};
+
 //........................................................................
 
 osgearth.FunctionLocation = {
@@ -1029,7 +1064,7 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
         // delete all the children's textures to free their memory.
         var i, n = this.children.length;
         for (i = 0; i < n; ++i) {
-            this.children[i].cleanUp();
+            this.children[i].destroy();
         }
 
         this.removeChildren();
@@ -1038,15 +1073,11 @@ osgearth.Tile.prototype = osg.objectInehrit(osg.Node.prototype, {
 
     // free memory associated with the Tile.
     // todo: check for buffer objects as well.
-    cleanUp: function() {
+    destroy: function() {
         for (j = 0; j < this.textures.length; ++j) {
-            var tex = this.textures[j];
-            if (tex.textureObject !== null) {
-                gl.deleteTexture(tex.textureObject);
-                tex.textureObject = null;
-                tex.image = undefined;
-            }
+            osg.Texture.destroy(this.textures[j]);
         }
+        osg.Geometry.destroy(this.geometry);
     },
 
     build: function(parentTextures) {
